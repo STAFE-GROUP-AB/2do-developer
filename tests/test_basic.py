@@ -7,10 +7,12 @@ import unittest
 import tempfile
 import os
 from pathlib import Path
+from PIL import Image, ImageDraw
 
 from ai_redirector.config import ConfigManager
 from ai_redirector.todo_manager import TodoManager
 from ai_redirector.tech_stack import TechStackDetector
+from ai_redirector.image_handler import ImageHandler
 
 class TestAIRedirector(unittest.TestCase):
     """Basic tests for core functionality"""
@@ -33,28 +35,39 @@ class TestAIRedirector(unittest.TestCase):
     
     def test_todo_manager(self):
         """Test todo management functionality"""
-        todo_manager = TodoManager()
-        
-        # Test adding a todo
-        todo_id = todo_manager.add_todo(
-            "Test Todo",
-            "Test Description",
-            "general",
-            "medium"
-        )
-        
-        self.assertIsNotNone(todo_id)
-        
-        # Test retrieving todos
-        todos = todo_manager.get_todos()
-        self.assertEqual(len(todos), 1)
-        self.assertEqual(todos[0]["title"], "Test Todo")
-        
-        # Test updating todo status
-        todo_manager.update_todo_status(todo_id, "completed", "Test result")
-        updated_todo = todo_manager.get_todo_by_id(todo_id)
-        self.assertEqual(updated_todo["status"], "completed")
-        self.assertEqual(updated_todo["result"], "Test result")
+        # Create a todo manager with a temporary directory to avoid conflicts
+        original_home = os.environ.get('HOME')
+        with tempfile.TemporaryDirectory() as temp_home:
+            os.environ['HOME'] = temp_home
+            
+            todo_manager = TodoManager()
+            
+            # Test adding a todo
+            todo_id = todo_manager.add_todo(
+                "Test Todo",
+                "Test Description",
+                "general",
+                "medium"
+            )
+            
+            self.assertIsNotNone(todo_id)
+            
+            # Test retrieving todos
+            todos = todo_manager.get_todos()
+            self.assertEqual(len(todos), 1)
+            self.assertEqual(todos[0]["title"], "Test Todo")
+            
+            # Test updating todo status
+            todo_manager.update_todo_status(todo_id, "completed", "Test result")
+            updated_todo = todo_manager.get_todo_by_id(todo_id)
+            self.assertEqual(updated_todo["status"], "completed")
+            self.assertEqual(updated_todo["result"], "Test result")
+            
+            # Restore original HOME
+            if original_home:
+                os.environ['HOME'] = original_home
+            elif 'HOME' in os.environ:
+                del os.environ['HOME']
     
     def test_tech_stack_detection(self):
         """Test technology stack detection"""
@@ -86,6 +99,43 @@ class TestAIRedirector(unittest.TestCase):
         self.assertIn("description", python_context)
         self.assertIn("best_practices", python_context)
         self.assertIn("common_libraries", python_context)
+    
+    def test_image_handler(self):
+        """Test image handling functionality"""
+        handler = ImageHandler()
+        
+        # Create a test image
+        test_image = Image.new('RGB', (100, 50), color=(255, 0, 0))
+        draw = ImageDraw.Draw(test_image)
+        draw.text((10, 20), "Test", fill=(255, 255, 255))
+        
+        # Test ASCII preview creation
+        ascii_preview = handler.create_ascii_preview(test_image, 20, 5)
+        self.assertIsInstance(ascii_preview, str)
+        self.assertGreater(len(ascii_preview), 0)
+        
+        # Test temporary image saving
+        temp_path = handler.save_image_temporarily(test_image, "test")
+        self.assertTrue(os.path.exists(temp_path))
+        self.assertTrue(temp_path.endswith('.png'))
+        
+        # Test saved image can be loaded
+        saved_image = Image.open(temp_path)
+        self.assertEqual(saved_image.size, test_image.size)
+        
+        # Test clipboard detection (will return None since no image in clipboard)
+        clipboard_image = handler.check_clipboard_for_image()
+        # This should return None in test environment
+        self.assertIsNone(clipboard_image)
+        
+        # Test file path detection
+        self.assertTrue(handler._is_image_file_path(temp_path))
+        self.assertFalse(handler._is_image_file_path("not_an_image.txt"))
+        self.assertFalse(handler._is_image_file_path("/nonexistent/path.jpg"))
+        
+        # Clean up
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 if __name__ == '__main__':
     unittest.main()
