@@ -11,11 +11,23 @@ from typing import Dict, Optional
 class ConfigManager:
     """Manages configuration and API keys for AI models"""
     
-    def __init__(self):
-        self.config_dir = Path.home() / ".ai_redirector"
+    def __init__(self, project_dir=None):
+        # If project_dir is provided and is a git repo, use local 2DO folder
+        if project_dir and self._is_git_repo(project_dir):
+            self.config_dir = Path(project_dir) / "2DO"
+            self.is_local_project = True
+        else:
+            self.config_dir = Path.home() / ".ai_redirector"
+            self.is_local_project = False
+            
         self.config_file = self.config_dir / "config.yaml"
         self.config_dir.mkdir(exist_ok=True)
         self._load_config()
+    
+    def _is_git_repo(self, path):
+        """Check if the path is a git repository"""
+        git_dir = Path(path) / ".git"
+        return git_dir.exists()
     
     def _load_config(self):
         """Load configuration from file"""

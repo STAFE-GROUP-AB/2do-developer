@@ -33,7 +33,9 @@ class TestAIRedirector(unittest.TestCase):
     
     def test_todo_manager(self):
         """Test todo management functionality"""
-        todo_manager = TodoManager()
+        # Use temporary directory to avoid test interference
+        temp_config_dir = Path(self.temp_dir) / "test_config"
+        todo_manager = TodoManager(temp_config_dir)
         
         # Test adding a todo
         todo_id = todo_manager.add_todo(
@@ -78,7 +80,9 @@ class TestAIRedirector(unittest.TestCase):
     
     def test_memory_file_creation(self):
         """Test memory file creation for tech stack"""
-        detector = TechStackDetector()
+        # Use temporary directory for testing
+        temp_config_dir = Path(self.temp_dir) / "test_memory"
+        detector = TechStackDetector(temp_config_dir)
         
         # Test memory context retrieval
         python_context = detector.get_memory_context("python")
@@ -86,6 +90,154 @@ class TestAIRedirector(unittest.TestCase):
         self.assertIn("description", python_context)
         self.assertIn("best_practices", python_context)
         self.assertIn("common_libraries", python_context)
+    
+    def test_tall_stack_detection(self):
+        """Test TALL stack technology detection"""
+        detector = TechStackDetector()
+        
+        # Create a temporary repository with TALL stack files
+        test_repo = Path(self.temp_dir) / "tall_repo"
+        test_repo.mkdir()
+        
+        # Create Laravel composer.json
+        (test_repo / "composer.json").write_text('''{
+            "require": {
+                "laravel/framework": "^10.0",
+                "livewire/livewire": "^3.0"
+            }
+        }''')
+        
+        # Create package.json with TailwindCSS and Alpine.js
+        (test_repo / "package.json").write_text('''{
+            "dependencies": {
+                "tailwindcss": "^3.0.0",
+                "alpinejs": "^3.0.0"
+            }
+        }''')
+        
+        # Create artisan file
+        (test_repo / "artisan").write_text("#!/usr/bin/env php")
+        
+        # Test detection
+        tech_stack = detector.analyze_repo(str(test_repo))
+        
+        self.assertIn("laravel", tech_stack)
+        self.assertIn("livewire", tech_stack)
+        self.assertIn("tailwindcss", tech_stack)
+        self.assertIn("alpinejs", tech_stack)
+    
+    def test_local_2do_config(self):
+        """Test local 2DO folder configuration for git repositories"""
+        # Create a mock git repository
+        git_repo = Path(self.temp_dir) / "git_test"
+        git_repo.mkdir()
+        (git_repo / ".git").mkdir()
+        
+        # Test ConfigManager with git repo
+        config = ConfigManager(str(git_repo))
+        self.assertTrue(config.is_local_project)
+        self.assertTrue(str(config.config_dir).endswith("2DO"))
+        
+        # Test ConfigManager without git repo
+        non_git_repo = Path(self.temp_dir) / "non_git"
+        non_git_repo.mkdir()
+        
+        config2 = ConfigManager(str(non_git_repo))
+        self.assertFalse(config2.is_local_project)
+        self.assertFalse(str(config2.config_dir).endswith("2DO"))
+    
+    def test_markdown_task_parsing(self):
+        """Test markdown task parsing functionality"""
+        from ai_redirector.markdown_parser import MarkdownTaskParser
+        
+        # Create a test markdown file
+        test_md = Path(self.temp_dir) / "test_tasks.md"
+        test_md.write_text("""# Project Tasks
+
+## Development
+- [ ] Implement user authentication
+- [x] Set up database schema
+- TODO: Write unit tests
+
+## Documentation
+* [ ] Update README
+* [x] Create API documentation
+
+### Bugs
++ [ ] Fix login redirect issue
+""")
+        
+        parser = MarkdownTaskParser()
+        tasks = parser.parse_file(str(test_md))
+        
+        # Should find 6 tasks total
+        self.assertEqual(len(tasks), 6)
+        
+        # Check task content
+        task_titles = [task['title'] for task in tasks]
+        self.assertIn('Implement user authentication', task_titles)
+        self.assertIn('Write unit tests', task_titles)
+        self.assertIn('Update README', task_titles)
+        
+        # Check status
+        completed_tasks = [task for task in tasks if task['status'] == 'completed']
+        pending_tasks = [task for task in tasks if task['status'] == 'pending']
+        
+        self.assertEqual(len(completed_tasks), 2)  # Set up database schema, Create API documentation
+        self.assertEqual(len(pending_tasks), 4)   # Remaining tasks
+        
+        # Test summary
+        summary = parser.get_task_summary(tasks)
+        self.assertEqual(summary['total_tasks'], 6)
+        self.assertEqual(summary['pending_tasks'], 4)
+        self.assertEqual(summary['completed_tasks'], 2)
+    
+    def test_github_url_parsing(self):
+        """Test GitHub URL parsing functionality"""
+        from ai_redirector.github_integration import GitHubIntegration
+        
+        github_integration = GitHubIntegration()  # No token for testing
+        
+        # Test HTTPS URL
+        https_url = "https://github.com/user/repo.git"
+        info = github_integration._parse_github_url(https_url)
+        self.assertIsNotNone(info)
+        self.assertEqual(info['owner'], 'user')
+        self.assertEqual(info['repo_name'], 'repo')
+        self.assertEqual(info['full_name'], 'user/repo')
+        
+        # Test SSH URL
+        ssh_url = "git@github.com:user/repo.git"
+        info = github_integration._parse_github_url(ssh_url)
+        self.assertIsNotNone(info)
+        self.assertEqual(info['owner'], 'user')
+        self.assertEqual(info['repo_name'], 'repo')
+        
+        # Test invalid URL
+        invalid_url = "https://gitlab.com/user/repo.git"
+        info = github_integration._parse_github_url(invalid_url)
+        self.assertIsNone(info)
+    
+    def test_branch_name_sanitization(self):
+        """Test branch name sanitization for GitHub issues"""
+        from ai_redirector.github_integration import GitHubIntegration
+        
+        github_integration = GitHubIntegration()
+        
+        # Test normal title
+        title = "Fix login bug"
+        sanitized = github_integration._sanitize_branch_name(title)
+        self.assertEqual(sanitized, "fix-login-bug")
+        
+        # Test title with special characters
+        title = "Add feature: user authentication (with OAuth2)"
+        sanitized = github_integration._sanitize_branch_name(title)
+        self.assertEqual(sanitized, "add-feature-user-authenticatio")  # Truncated to 30 chars
+        
+        # Test title with multiple spaces
+        title = "Update   documentation    files"
+        sanitized = github_integration._sanitize_branch_name(title)
+        self.assertEqual(sanitized, "update-documentation-files")
 
 if __name__ == '__main__':
     unittest.main()

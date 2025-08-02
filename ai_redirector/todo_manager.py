@@ -27,8 +27,11 @@ class Todo:
 class TodoManager:
     """Manages todo items and persistence"""
     
-    def __init__(self):
-        self.todo_dir = Path.home() / ".ai_redirector" / "todos"
+    def __init__(self, config_dir=None):
+        if config_dir:
+            self.todo_dir = Path(config_dir) / "todos"
+        else:
+            self.todo_dir = Path.home() / ".ai_redirector" / "todos"
         self.todo_file = self.todo_dir / "todos.json"
         self.todo_dir.mkdir(parents=True, exist_ok=True)
         self.todos = self._load_todos()
