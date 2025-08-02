@@ -25,7 +25,7 @@ from .github_integration import GitHubIntegration
 console = Console()
 
 @click.group()
-@click.version_option()
+@click.version_option(package_name="2do")
 def cli():
     """2DO - Intelligent AI model routing and multitasking CLI tool"""
     pass
