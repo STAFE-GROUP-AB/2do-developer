@@ -13,6 +13,8 @@ setup(
         "requests>=2.28.0",
         "aiohttp>=3.8.0",
         "rich>=13.0.0",
+        "PyGithub>=2.0.0",
+        "GitPython>=3.1.0",
     ],
     entry_points={
         "console_scripts": [

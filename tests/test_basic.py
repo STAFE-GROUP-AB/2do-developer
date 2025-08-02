@@ -191,6 +191,53 @@ class TestAIRedirector(unittest.TestCase):
         self.assertEqual(summary['total_tasks'], 6)
         self.assertEqual(summary['pending_tasks'], 4)
         self.assertEqual(summary['completed_tasks'], 2)
+    
+    def test_github_url_parsing(self):
+        """Test GitHub URL parsing functionality"""
+        from ai_redirector.github_integration import GitHubIntegration
+        
+        github_integration = GitHubIntegration()  # No token for testing
+        
+        # Test HTTPS URL
+        https_url = "https://github.com/user/repo.git"
+        info = github_integration._parse_github_url(https_url)
+        self.assertIsNotNone(info)
+        self.assertEqual(info['owner'], 'user')
+        self.assertEqual(info['repo_name'], 'repo')
+        self.assertEqual(info['full_name'], 'user/repo')
+        
+        # Test SSH URL
+        ssh_url = "git@github.com:user/repo.git"
+        info = github_integration._parse_github_url(ssh_url)
+        self.assertIsNotNone(info)
+        self.assertEqual(info['owner'], 'user')
+        self.assertEqual(info['repo_name'], 'repo')
+        
+        # Test invalid URL
+        invalid_url = "https://gitlab.com/user/repo.git"
+        info = github_integration._parse_github_url(invalid_url)
+        self.assertIsNone(info)
+    
+    def test_branch_name_sanitization(self):
+        """Test branch name sanitization for GitHub issues"""
+        from ai_redirector.github_integration import GitHubIntegration
+        
+        github_integration = GitHubIntegration()
+        
+        # Test normal title
+        title = "Fix login bug"
+        sanitized = github_integration._sanitize_branch_name(title)
+        self.assertEqual(sanitized, "fix-login-bug")
+        
+        # Test title with special characters
+        title = "Add feature: user authentication (with OAuth2)"
+        sanitized = github_integration._sanitize_branch_name(title)
+        self.assertEqual(sanitized, "add-feature-user-authenticatio")  # Truncated to 30 chars
+        
+        # Test title with multiple spaces
+        title = "Update   documentation    files"
+        sanitized = github_integration._sanitize_branch_name(title)
+        self.assertEqual(sanitized, "update-documentation-files")
 
 if __name__ == '__main__':
     unittest.main()
