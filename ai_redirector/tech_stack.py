@@ -13,8 +13,11 @@ console = Console()
 class TechStackDetector:
     """Detects technology stack from repository analysis"""
     
-    def __init__(self):
-        self.memory_dir = Path.home() / ".ai_redirector" / "memory"
+    def __init__(self, config_dir=None):
+        if config_dir:
+            self.memory_dir = Path(config_dir) / "memory"
+        else:
+            self.memory_dir = Path.home() / ".ai_redirector" / "memory"
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         
         # Define file patterns for different technologies
@@ -39,7 +42,12 @@ class TechStackDetector:
             "html": [".html", ".htm"],
             "css": [".css", ".scss", ".sass", ".less"],
             "database": [".sql", ".db", ".sqlite", ".sqlite3"],
-            "git": [".gitignore", ".gitattributes", ".git"]
+            "git": [".gitignore", ".gitattributes", ".git"],
+            # TALL Stack components
+            "laravel": ["artisan", "composer.json"], # Special case, checked in content
+            "livewire": ["composer.json"], # Special case, checked in content
+            "tailwindcss": ["tailwind.config.js", "tailwind.config.ts", "package.json"], # Special case, checked in content
+            "alpinejs": ["package.json"] # Special case, checked in content
         }
     
     def analyze_repo(self, repo_path: str) -> List[str]:
@@ -65,6 +73,11 @@ class TechStackDetector:
         package_json = repo_path / "package.json"
         if package_json.exists():
             self._analyze_package_json(package_json, detected_techs)
+        
+        # Special analysis for composer.json content (Laravel/Livewire)
+        composer_json = repo_path / "composer.json"
+        if composer_json.exists():
+            self._analyze_composer_json(composer_json, detected_techs)
         
         return sorted(list(detected_techs))
     
@@ -115,9 +128,37 @@ class TechStackDetector:
             
             if 'next' in dependencies or 'nuxt' in dependencies:
                 detected_techs.add('react' if 'next' in dependencies else 'vue')
+            
+            # TALL Stack detection
+            if 'tailwindcss' in dependencies or '@tailwindcss/forms' in dependencies:
+                detected_techs.add('tailwindcss')
+            
+            if 'alpinejs' in dependencies or '@alpinejs/collapse' in dependencies:
+                detected_techs.add('alpinejs')
                 
         except Exception as e:
             console.print(f"⚠️  Could not analyze package.json: {e}")
+    
+    def _analyze_composer_json(self, composer_json_path: Path, detected_techs: Set[str]):
+        """Analyze composer.json for Laravel/Livewire"""
+        try:
+            with open(composer_json_path, 'r') as f:
+                composer_data = json.load(f)
+            
+            dependencies = {}
+            dependencies.update(composer_data.get('require', {}))
+            dependencies.update(composer_data.get('require-dev', {}))
+            
+            # Check for Laravel
+            if 'laravel/framework' in dependencies or 'laravel/laravel' in dependencies:
+                detected_techs.add('laravel')
+            
+            # Check for Livewire
+            if 'livewire/livewire' in dependencies:
+                detected_techs.add('livewire')
+                
+        except Exception as e:
+            console.print(f"⚠️  Could not analyze composer.json: {e}")
     
     def create_memory_files(self, tech_stack: List[str]):
         """Create memory files for detected technologies"""
@@ -179,6 +220,42 @@ class TechStackDetector:
                 "file_extensions": [],
                 "testing_frameworks": ["docker-compose", "testcontainers"],
                 "package_managers": []
+            },
+            "laravel": {
+                "description": "PHP web application framework",
+                "common_patterns": ["MVC architecture", "Eloquent ORM", "Artisan commands", "Middleware"],
+                "best_practices": ["Use service containers", "Follow PSR standards", "Implement form requests"],
+                "common_libraries": ["eloquent", "blade", "artisan", "tinker"],
+                "file_extensions": [".php"],
+                "testing_frameworks": ["phpunit", "pest"],
+                "package_managers": ["composer"]
+            },
+            "livewire": {
+                "description": "Laravel framework for building dynamic interfaces",
+                "common_patterns": ["Component-based", "Server-side rendering", "Real-time updates"],
+                "best_practices": ["Use wire:model for data binding", "Optimize with wire:key", "Handle loading states"],
+                "common_libraries": ["alpine.js", "turbo"],
+                "file_extensions": [".php", ".blade.php"],
+                "testing_frameworks": ["livewire-testing", "phpunit"],
+                "package_managers": ["composer", "npm"]
+            },
+            "tailwindcss": {
+                "description": "Utility-first CSS framework",
+                "common_patterns": ["Utility classes", "Component composition", "Responsive design"],
+                "best_practices": ["Use @apply for custom components", "Purge unused CSS", "Use semantic naming"],
+                "common_libraries": ["@tailwindcss/forms", "@tailwindcss/typography"],
+                "file_extensions": [".css"],
+                "testing_frameworks": [],
+                "package_managers": ["npm", "yarn"]
+            },
+            "alpinejs": {
+                "description": "Lightweight JavaScript framework for HTML",
+                "common_patterns": ["x-data", "x-show", "x-if", "x-for", "Alpine stores"],
+                "best_practices": ["Keep components small", "Use Alpine.store for global state", "Prefer declarative syntax"],
+                "common_libraries": ["@alpinejs/persist", "@alpinejs/collapse"],
+                "file_extensions": [".js", ".html"],
+                "testing_frameworks": ["cypress", "playwright"],
+                "package_managers": ["npm", "cdn"]
             }
         }
         
@@ -219,6 +296,22 @@ class TechStackDetector:
         
         if "kubernetes" in tech_stack and "docker" in tech_stack:
             notes.append("Container orchestration setup - ensure proper resource limits and health checks")
+        
+        # TALL Stack integration notes
+        tall_components = {"tailwindcss", "alpinejs", "laravel", "livewire"}
+        detected_tall = tall_components.intersection(set(tech_stack))
+        
+        if len(detected_tall) >= 2:
+            notes.append(f"TALL Stack components detected: {', '.join(detected_tall)}")
+            
+        if "laravel" in tech_stack and "livewire" in tech_stack:
+            notes.append("Laravel + Livewire: Perfect for building reactive interfaces without complex JavaScript")
+            
+        if "tailwindcss" in tech_stack and "alpinejs" in tech_stack:
+            notes.append("TailwindCSS + Alpine.js: Excellent combination for utility-first styling with lightweight interactions")
+        
+        if len(detected_tall) == 4:
+            notes.append("Complete TALL Stack detected - modern full-stack development with minimal JavaScript complexity")
         
         return notes
     

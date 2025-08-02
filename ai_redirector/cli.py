@@ -19,6 +19,7 @@ from .ai_router import AIRouter
 from .todo_manager import TodoManager
 from .multitasker import Multitasker
 from .tech_stack import TechStackDetector
+from .markdown_parser import MarkdownTaskParser
 
 console = Console()
 
@@ -60,19 +61,29 @@ def start(repo):
     """Start the AI Redirector interactive session"""
     console.print(Panel.fit("🤖 AI Redirector Starting...", style="bold green"))
     
-    config_manager = ConfigManager()
+    # Determine the working directory
+    working_dir = repo if repo else os.getcwd()
+    
+    # Check if we're in a git repository
+    config_manager = ConfigManager(working_dir)
+    if config_manager.is_local_project:
+        console.print(f"📁 Using local 2DO folder in git repository: {working_dir}")
+    else:
+        console.print("🏠 Using global configuration")
+    
     if not config_manager.has_api_keys():
         console.print("❌ No API keys configured. Please run 'airedirector setup' first.")
         return
     
     ai_router = AIRouter(config_manager)
-    todo_manager = TodoManager()
+    todo_manager = TodoManager(config_manager.config_dir)
     multitasker = Multitasker(ai_router)
-    tech_detector = TechStackDetector()
+    tech_detector = TechStackDetector(config_manager.config_dir)
     
-    if repo:
-        console.print(f"📁 Analyzing repository: {repo}")
-        tech_stack = tech_detector.analyze_repo(repo)
+    if repo or config_manager.is_local_project:
+        analysis_path = repo if repo else working_dir
+        console.print(f"📁 Analyzing repository: {analysis_path}")
+        tech_stack = tech_detector.analyze_repo(analysis_path)
         console.print(f"🔍 Detected tech stack: {', '.join(tech_stack)}")
         
         # Create memory files for tech stack
@@ -85,7 +96,7 @@ def start(repo):
         console.print("\n" + "="*50)
         action = Prompt.ask(
             "What would you like to do?",
-            choices=["add-todo", "list-todos", "start-multitask", "chat", "quit"],
+            choices=["add-todo", "list-todos", "start-multitask", "parse-markdown", "chat", "quit"],
             default="chat"
         )
         
@@ -97,6 +108,8 @@ def start(repo):
             handle_list_todos(todo_manager)
         elif action == "start-multitask":
             handle_multitask(multitasker, todo_manager)
+        elif action == "parse-markdown":
+            handle_parse_markdown(todo_manager, working_dir)
         elif action == "chat":
             handle_chat(ai_router)
 
@@ -180,16 +193,87 @@ def handle_multitask(multitasker, todo_manager):
 def handle_chat(ai_router):
     """Handle interactive chat with AI routing"""
     console.print("💬 Chat mode - AI Redirector will choose the best model for your prompt")
-    console.print("Type 'exit' to return to main menu\n")
+    console.print("Type 'exit' to return to main menu")
+    console.print("Type 'image:path/to/file' to include an image in your prompt\n")
     
     while True:
         prompt = Prompt.ask("You")
         if prompt.lower() == 'exit':
             break
         
+        # Check if prompt contains image reference
+        image_path = None
+        if prompt.startswith('image:'):
+            parts = prompt.split(':', 1)
+            if len(parts) == 2:
+                image_path = parts[1].strip()
+                if not os.path.exists(image_path):
+                    console.print(f"❌ Image file not found: {image_path}")
+                    continue
+                prompt = Prompt.ask("Enter your prompt about the image")
+        
         # Route to best AI model
-        response = ai_router.route_and_process(prompt)
+        if image_path:
+            response = ai_router.route_and_process_with_image(prompt, image_path)
+        else:
+            response = ai_router.route_and_process(prompt)
         console.print(f"\n🤖 AI: {response}\n")
+
+def handle_parse_markdown(todo_manager, working_dir):
+    """Handle parsing markdown files for tasks"""
+    parser = MarkdownTaskParser()
+    
+    # Ask for file or directory
+    target = Prompt.ask(
+        "Parse markdown file or directory?", 
+        choices=["file", "directory", "current"],
+        default="current"
+    )
+    
+    if target == "file":
+        file_path = Prompt.ask("Enter path to markdown file")
+        if not os.path.isabs(file_path):
+            file_path = os.path.join(working_dir, file_path)
+        tasks = parser.parse_file(file_path)
+    elif target == "directory":
+        dir_path = Prompt.ask("Enter directory path", default=working_dir)
+        if not os.path.isabs(dir_path):
+            dir_path = os.path.join(working_dir, dir_path)
+        tasks = parser.parse_directory(dir_path)
+    else:  # current
+        tasks = parser.parse_directory(working_dir)
+    
+    if not tasks:
+        console.print("📝 No tasks found in markdown files")
+        return
+    
+    # Show summary
+    summary = parser.get_task_summary(tasks)
+    console.print(f"\n📊 Found {summary['total_tasks']} tasks:")
+    console.print(f"   ✅ {summary['completed_tasks']} completed")
+    console.print(f"   ⏳ {summary['pending_tasks']} pending")
+    console.print(f"   📄 {summary['files_with_tasks']} files with tasks")
+    
+    # Show first few tasks as preview
+    console.print("\n📋 Preview of tasks:")
+    for i, task in enumerate(tasks[:5]):
+        status_icon = "✅" if task['status'] == 'completed' else "⏳"
+        console.print(f"   {status_icon} {task['title'][:60]}...")
+    
+    if len(tasks) > 5:
+        console.print(f"   ... and {len(tasks) - 5} more tasks")
+    
+    # Ask if user wants to create todos from pending tasks
+    pending_tasks = [t for t in tasks if t['status'] == 'pending']
+    if pending_tasks and Confirm.ask(f"\nCreate {len(pending_tasks)} todos from pending tasks?"):
+        priority = Prompt.ask(
+            "Priority for created todos",
+            choices=["low", "medium", "high", "critical"],
+            default="medium"
+        )
+        
+        todo_ids = parser.create_todos_from_tasks(tasks, todo_manager, priority)
+        console.print(f"✅ Created {len(todo_ids)} todos from markdown tasks")
 
 def main():
     """Main entry point"""
