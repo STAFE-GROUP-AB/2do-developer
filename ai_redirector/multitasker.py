@@ -1,0 +1,146 @@
+"""
+Multitasker - Handles parallel processing of multiple todos using different AI models
+"""
+
+import asyncio
+import concurrent.futures
+from typing import List, Dict
+from rich.console import Console
+from rich.progress import Progress, TaskID
+
+console = Console()
+
+class Multitasker:
+    """Manages parallel execution of todos using optimal AI models"""
+    
+    def __init__(self, ai_router):
+        self.ai_router = ai_router
+        self.max_workers = 5  # Maximum concurrent tasks
+    
+    async def process_todo_async(self, todo: Dict) -> Dict:
+        """Process a single todo asynchronously"""
+        try:
+            # Update status to in_progress
+            todo["status"] = "in_progress"
+            
+            # Create prompt based on todo type and content
+            prompt = self._create_prompt_for_todo(todo)
+            
+            # Route to best AI model and process
+            result = self.ai_router.route_and_process(prompt)
+            
+            # Update todo with result
+            todo["status"] = "completed"
+            todo["result"] = result
+            
+            return todo
+            
+        except Exception as e:
+            console.print(f"❌ Error processing todo {todo['id']}: {str(e)}")
+            todo["status"] = "failed"
+            todo["result"] = f"Error: {str(e)}"
+            return todo
+    
+    def _create_prompt_for_todo(self, todo: Dict) -> str:
+        """Create an appropriate prompt based on todo type and content"""
+        base_prompt = f"Task: {todo['title']}\nDescription: {todo['description']}\n"
+        
+        if todo["todo_type"] == "code":
+            base_prompt += "This is a coding task. Please provide a complete solution with code examples and explanations.\n"
+        elif todo["todo_type"] == "text":
+            base_prompt += "This is a text-based task. Please provide a comprehensive written response.\n"
+        elif todo["todo_type"] == "image":
+            base_prompt += "This relates to image processing or analysis.\n"
+        
+        if todo["content"]:
+            base_prompt += f"\nAdditional context:\n{todo['content']}\n"
+        
+        base_prompt += f"\nPriority: {todo['priority']}\n"
+        base_prompt += "Please provide a detailed and actionable response."
+        
+        return base_prompt
+    
+    def start_multitask(self, todos: List[Dict]):
+        """Start multitasking processing of todos"""
+        if not todos:
+            console.print("No todos to process")
+            return
+        
+        console.print(f"🚀 Starting multitask processing for {len(todos)} todos...")
+        
+        # Run async processing
+        results = asyncio.run(self._process_todos_parallel(todos))
+        
+        # Display results
+        self._display_results(results)
+    
+    async def _process_todos_parallel(self, todos: List[Dict]) -> List[Dict]:
+        """Process todos in parallel with progress tracking"""
+        
+        with Progress() as progress:
+            task = progress.add_task("[cyan]Processing todos...", total=len(todos))
+            
+            # Create semaphore to limit concurrent tasks
+            semaphore = asyncio.Semaphore(self.max_workers)
+            
+            async def process_with_semaphore(todo):
+                async with semaphore:
+                    result = await self.process_todo_async(todo)
+                    progress.advance(task)
+                    return result
+            
+            # Create tasks for all todos
+            tasks = [process_with_semaphore(todo) for todo in todos]
+            
+            # Wait for all tasks to complete
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            return [r for r in results if not isinstance(r, Exception)]
+    
+    def _display_results(self, results: List[Dict]):
+        """Display processing results"""
+        console.print("\n" + "="*60)
+        console.print("📊 Multitask Processing Results")
+        console.print("="*60)
+        
+        completed = 0
+        failed = 0
+        
+        for result in results:
+            status = result["status"]
+            if status == "completed":
+                completed += 1
+                console.print(f"✅ {result['title']} - COMPLETED")
+                if result.get("result"):
+                    # Show first 100 chars of result
+                    preview = result["result"][:100] + "..." if len(result["result"]) > 100 else result["result"]
+                    console.print(f"   📝 Result preview: {preview}")
+            elif status == "failed":
+                failed += 1
+                console.print(f"❌ {result['title']} - FAILED")
+                if result.get("result"):
+                    console.print(f"   ⚠️  Error: {result['result']}")
+        
+        console.print(f"\n📈 Summary: {completed} completed, {failed} failed out of {len(results)} total")
+    
+    def process_batch_by_type(self, todos: List[Dict], todo_type: str):
+        """Process a batch of todos of a specific type"""
+        filtered_todos = [todo for todo in todos if todo["todo_type"] == todo_type]
+        
+        if not filtered_todos:
+            console.print(f"No todos of type '{todo_type}' found")
+            return
+        
+        console.print(f"🎯 Processing {len(filtered_todos)} todos of type '{todo_type}'...")
+        self.start_multitask(filtered_todos)
+    
+    def process_batch_by_priority(self, todos: List[Dict], priority: str):
+        """Process a batch of todos of a specific priority"""
+        filtered_todos = [todo for todo in todos if todo["priority"] == priority]
+        
+        if not filtered_todos:
+            console.print(f"No todos with priority '{priority}' found")
+            return
+        
+        console.print(f"🚨 Processing {len(filtered_todos)} todos with priority '{priority}'...")
+        self.start_multitask(filtered_todos)
