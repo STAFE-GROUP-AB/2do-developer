@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Demo script for AI Redirector
+Demo script for 2DO
 Demonstrates key functionality without requiring API keys
 """
 
@@ -9,9 +9,9 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.tree import Tree
 
-from ai_redirector.todo_manager import TodoManager
-from ai_redirector.tech_stack import TechStackDetector
-from ai_redirector.ai_router import AIRouter, ModelCapability
+from twodo.todo_manager import TodoManager
+from twodo.tech_stack import TechStackDetector
+from twodo.ai_router import AIRouter, ModelCapability
 
 console = Console()
 
@@ -184,8 +184,8 @@ def demo_multitasking_concept():
 
 def main():
     """Run the complete demo"""
-    console.print(Panel.fit("🚀 AI Redirector - Interactive Demo", style="bold white on blue"))
-    console.print("This demo showcases the key features of AI Redirector without requiring API keys.\n")
+    console.print(Panel.fit("🚀 2DO - Interactive Demo", style="bold white on blue"))
+    console.print("This demo showcases the key features of 2DO without requiring API keys.\n")
     
     try:
         demo_tech_stack_detection()
@@ -195,11 +195,11 @@ def main():
         
         console.print("\n" + "="*60)
         console.print(Panel.fit("✨ Demo Complete!", style="bold green"))
-        console.print("To use AI Redirector with real AI models:")
-        console.print("1. Run: airedirector setup")
+        console.print("To use 2DO with real AI models:")
+        console.print("1. Run: 2do setup")
         console.print("2. Enter your API keys for OpenAI, Anthropic, etc.")
-        console.print("3. Run: airedirector start")
-        console.print("4. Start creating todos and let AI Redirector work its magic! 🎉")
+        console.print("3. Run: 2do start")
+        console.print("4. Start creating todos and let 2DO work its magic! 🎉")
         
     except Exception as e:
         console.print(f"❌ Demo error: {e}")

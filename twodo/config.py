@@ -1,5 +1,5 @@
 """
-Configuration management for AI Redirector
+Configuration management for 2DO
 """
 
 import os
@@ -17,7 +17,7 @@ class ConfigManager:
             self.config_dir = Path(project_dir) / "2DO"
             self.is_local_project = True
         else:
-            self.config_dir = Path.home() / ".ai_redirector"
+            self.config_dir = Path.home() / ".2do"
             self.is_local_project = False
             
         self.config_file = self.config_dir / "config.yaml"
