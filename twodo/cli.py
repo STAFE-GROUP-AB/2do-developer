@@ -22,6 +22,7 @@ from .tech_stack import TechStackDetector
 from .markdown_parser import MarkdownTaskParser
 from .github_integration import GitHubIntegration
 from .browser_integration import BrowserIntegration
+from .image_handler import ImageHandler
 
 from .setup_guide import SetupGuide
 
@@ -110,6 +111,7 @@ def start(repo):
     tech_detector = TechStackDetector(config_manager.config_dir)
     github_integration = GitHubIntegration(config_manager.get_api_key("github"))
     browser_integration = BrowserIntegration(working_dir)
+    image_handler = ImageHandler()
     
     # Get repository info if we're in a git repo
     repo_info = None
@@ -161,7 +163,7 @@ def start(repo):
                 browser_integration.stop_browser_mode()
             break
         elif action == "add-todo":
-            handle_add_todo(todo_manager, ai_router)
+            handle_add_todo(todo_manager, ai_router, image_handler)
         elif action == "list-todos":
             handle_list_todos(todo_manager)
         elif action == "create-subtasks":
@@ -184,9 +186,9 @@ def start(repo):
             if repo_info and github_integration.github:
                 handle_export_todos_to_github(github_integration, todo_manager, repo_info)
         elif action == "chat":
-            handle_chat(ai_router)
+            handle_chat(ai_router, image_handler)
 
-def handle_add_todo(todo_manager, ai_router):
+def handle_add_todo(todo_manager, ai_router, image_handler):
     """Handle adding a new todo item"""
     title = Prompt.ask("Todo title")
     description = Prompt.ask("Description (optional)", default="")
@@ -216,9 +218,14 @@ def handle_add_todo(todo_manager, ai_router):
             except EOFError:
                 content = "\n".join(lines)
     elif todo_type == "image":
-        file_path = Prompt.ask("Enter path to image file (optional)", default="")
-        if file_path and os.path.exists(file_path):
-            content = file_path
+        # Check for clipboard image first
+        clipboard_image_path = image_handler.prompt_for_clipboard_image()
+        if clipboard_image_path:
+            content = clipboard_image_path
+        else:
+            file_path = Prompt.ask("Enter path to image file (optional)", default="")
+            if file_path and os.path.exists(file_path):
+                content = file_path
     
     todo_id = todo_manager.add_todo(title, description, todo_type, priority, content)
     console.print("✅ Todo added successfully!")
@@ -313,18 +320,44 @@ def handle_multitask(multitasker, todo_manager, browser_integration):
             console.print("🔄 Auto-refreshing browser...")
             browser_integration.refresh_browser()
 
-def handle_chat(ai_router):
+def handle_chat(ai_router, image_handler):
     """Handle interactive chat with AI routing"""
     console.print("💬 Chat mode - 2DO will choose the best model for your prompt")
-    console.print("Type 'exit' to return to main menu")
-    console.print("Type 'image:path/to/file' to include an image in your prompt\n")
+    console.print("🖼️  You can paste images from clipboard - they will be detected automatically")
+    console.print("📸 Or type 'image' to load an image file manually")
+    console.print("Type 'exit' to return to main menu\n")
+    
+    # Clean up old temporary files
+    image_handler.cleanup_old_temp_files()
     
     while True:
         prompt = Prompt.ask("You")
         if prompt.lower() == 'exit':
             break
         
-        # Check if prompt contains image reference
+        # Check if user wants to work with images
+        clipboard_image_path = None
+        if prompt.lower() == 'image':
+            clipboard_image_path = image_handler.prompt_for_clipboard_image()
+            if clipboard_image_path:
+                prompt = Prompt.ask("What would you like to know about this image?")
+            else:
+                continue
+        else:
+            # Check for clipboard image automatically (non-intrusive)
+            try:
+                image = image_handler.check_clipboard_for_image()
+                if image is not None:
+                    console.print("🖼️  Image detected in clipboard!")
+                    from rich.prompt import Confirm
+                    if Confirm.ask("Include this image with your prompt?"):
+                        image_handler.display_image_info(image)
+                        clipboard_image_path = image_handler.save_image_temporarily(image)
+                        console.print(f"✅ Image attached")
+            except Exception:
+                pass  # Silently ignore clipboard errors
+        
+        # Check if prompt contains legacy image reference format
         image_path = None
         if prompt.startswith('image:'):
             parts = prompt.split(':', 1)
@@ -335,11 +368,22 @@ def handle_chat(ai_router):
                     continue
                 prompt = Prompt.ask("Enter your prompt about the image")
         
+        # If we have a clipboard image, include it in the context
+        if clipboard_image_path:
+            prompt_with_image = f"{prompt}\n\n[Image attached: {clipboard_image_path}]"
+            console.print(f"🖼️  Including attached image in your request...")
+        else:
+            prompt_with_image = prompt
+        
         # Route to best AI model
         if image_path:
-            response = ai_router.route_and_process_with_image(prompt, image_path)
+            # Legacy format support
+            if hasattr(ai_router, 'route_and_process_with_image'):
+                response = ai_router.route_and_process_with_image(prompt, image_path)
+            else:
+                response = ai_router.route_and_process(f"{prompt}\n\n[Image: {image_path}]")
         else:
-            response = ai_router.route_and_process(prompt)
+            response = ai_router.route_and_process(prompt_with_image)
         console.print(f"\n🤖 AI: {response}\n")
 
 def handle_parse_markdown(todo_manager, working_dir):
