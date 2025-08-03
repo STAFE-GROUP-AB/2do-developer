@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Basic tests for AI Redirector functionality
+Basic tests for 2DO functionality
 """
 
 import unittest
@@ -8,11 +8,11 @@ import tempfile
 import os
 from pathlib import Path
 
-from ai_redirector.config import ConfigManager
-from ai_redirector.todo_manager import TodoManager
-from ai_redirector.tech_stack import TechStackDetector
+from twodo.config import ConfigManager
+from twodo.todo_manager import TodoManager
+from twodo.tech_stack import TechStackDetector
 
-class TestAIRedirector(unittest.TestCase):
+class Test2DO(unittest.TestCase):
     """Basic tests for core functionality"""
     
     def setUp(self):
@@ -148,7 +148,7 @@ class TestAIRedirector(unittest.TestCase):
     
     def test_markdown_task_parsing(self):
         """Test markdown task parsing functionality"""
-        from ai_redirector.markdown_parser import MarkdownTaskParser
+        from twodo.markdown_parser import MarkdownTaskParser
         
         # Create a test markdown file
         test_md = Path(self.temp_dir) / "test_tasks.md"
@@ -194,7 +194,7 @@ class TestAIRedirector(unittest.TestCase):
     
     def test_github_url_parsing(self):
         """Test GitHub URL parsing functionality"""
-        from ai_redirector.github_integration import GitHubIntegration
+        from twodo.github_integration import GitHubIntegration
         
         github_integration = GitHubIntegration()  # No token for testing
         
@@ -220,7 +220,7 @@ class TestAIRedirector(unittest.TestCase):
     
     def test_branch_name_sanitization(self):
         """Test branch name sanitization for GitHub issues"""
-        from ai_redirector.github_integration import GitHubIntegration
+        from twodo.github_integration import GitHubIntegration
         
         github_integration = GitHubIntegration()
         

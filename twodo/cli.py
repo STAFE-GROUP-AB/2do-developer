@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI Redirector CLI - Main command line interface
+2DO CLI - Main command line interface
 """
 
 import click
@@ -25,15 +25,15 @@ from .github_integration import GitHubIntegration
 console = Console()
 
 @click.group()
-@click.version_option()
+@click.version_option(package_name="2do")
 def cli():
-    """AI Redirector - Intelligent AI model routing and multitasking CLI tool"""
+    """2DO - Intelligent AI model routing and multitasking CLI tool"""
     pass
 
 @cli.command()
 def setup():
     """Initial setup - configure AI model API keys"""
-    console.print(Panel.fit("🚀 Welcome to AI Redirector Setup", style="bold blue"))
+    console.print(Panel.fit("🚀 Welcome to 2DO Setup", style="bold blue"))
     
     config_manager = ConfigManager()
     
@@ -58,13 +58,13 @@ def setup():
         config_manager.set_api_key("github", github_token)
         console.print("✅ GitHub configured")
     
-    console.print("\n🎉 Setup complete! You can now use 'airedirector start' to begin.")
+    console.print("\n🎉 Setup complete! You can now use '2do start' to begin.")
 
 @cli.command()
 @click.option('--repo', '-r', help='GitHub repository or local path to analyze')
 def start(repo):
-    """Start the AI Redirector interactive session"""
-    console.print(Panel.fit("🤖 AI Redirector Starting...", style="bold green"))
+    """Start the 2DO interactive session"""
+    console.print(Panel.fit("🤖 2DO Starting...", style="bold green"))
     
     # Determine the working directory
     working_dir = repo if repo else os.getcwd()
@@ -77,7 +77,7 @@ def start(repo):
         console.print("🏠 Using global configuration")
     
     if not config_manager.has_api_keys():
-        console.print("❌ No API keys configured. Please run 'airedirector setup' first.")
+        console.print("❌ No API keys configured. Please run '2do setup' first.")
         return
     
     ai_router = AIRouter(config_manager)
@@ -221,7 +221,7 @@ def handle_multitask(multitasker, todo_manager):
 
 def handle_chat(ai_router):
     """Handle interactive chat with AI routing"""
-    console.print("💬 Chat mode - AI Redirector will choose the best model for your prompt")
+    console.print("💬 Chat mode - 2DO will choose the best model for your prompt")
     console.print("Type 'exit' to return to main menu")
     console.print("Type 'image:path/to/file' to include an image in your prompt\n")
     

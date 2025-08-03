@@ -1,6 +1,6 @@
-# AI Redirector
+# 2DO
 
-🤖 **AI Redirector** is an intelligent command line tool that automatically selects the best AI model for your prompts and enables powerful multitasking capabilities for developers.
+🤖 **2DO** is an intelligent command line tool that automatically selects the best AI model for your prompts and enables powerful multitasking capabilities for developers.
 
 ## Features
 
@@ -74,7 +74,7 @@ pip install -e .
 ### 1. Initial Setup
 ```bash
 # Configure your AI model API keys and GitHub integration
-airedirector setup
+2do setup
 ```
 
 This will guide you through configuring:
@@ -86,13 +86,13 @@ This will guide you through configuring:
 ```bash
 # Start in a git repository (automatically creates local 2DO folder)
 cd /path/to/your/git/project
-airedirector start
+2do start
 
 # Start with a specific repository
-airedirector start --repo /path/to/your/project
+2do start --repo /path/to/your/project
 
 # Start without a repository (uses global configuration)
-airedirector start
+2do start
 ```
 
 ### 3. Available Commands
@@ -115,8 +115,8 @@ airedirector start
 # Navigate to any git repository
 cd /path/to/your/git/project
 
-# Start AI Redirector - automatically creates 2DO folder
-airedirector start
+# Start 2DO - automatically creates 2DO folder
+2do start
 
 # The tool will:
 # 1. Detect it's a git repository
@@ -128,7 +128,7 @@ airedirector start
 ### Repository Analysis and Todo Generation
 ```bash
 # Analyze a GitHub repository and create todos
-airedirector start --repo https://github.com/user/project
+2do start --repo https://github.com/user/project
 
 # The tool will:
 # 1. Detect the tech stack (Python, React, Laravel, TailwindCSS, etc.)
@@ -159,7 +159,7 @@ airedirector start --repo https://github.com/user/project
 # * [ ] Another task format
 # + [ ] Yet another format
 
-# In AI Redirector:
+# In 2DO:
 # 1. Select "parse-markdown"
 # 2. Choose to parse current directory, specific file, or directory
 # 3. Review found tasks and create todos from them
@@ -170,13 +170,13 @@ airedirector start --repo https://github.com/user/project
 # In chat mode, include images:
 # 1. Type: image:/path/to/screenshot.png
 # 2. Enter your question about the image
-# 3. AI Redirector will choose the best model for image analysis
+# 3. 2DO will choose the best model for image analysis
 ```
 
 ### TALL Stack Development
 ```bash
 # When working in a Laravel project with TailwindCSS, Alpine.js, and Livewire:
-# 1. AI Redirector detects all TALL stack components
+# 1. 2DO detects all TALL stack components
 # 2. Creates specialized memory files with best practices
 # 3. Provides contextual advice for the full stack
 ```
@@ -200,7 +200,7 @@ Content: Path to image file
 ```
 
 ### Multitasking Processing
-When you start multitasking, the AI Redirector:
+When you start multitasking, the 2DO:
 1. Analyzes each todo to determine the best AI model
 2. Creates optimized prompts based on todo type and content
 3. Processes todos in parallel (up to 5 concurrent tasks)
@@ -209,7 +209,7 @@ When you start multitasking, the AI Redirector:
 
 ## AI Model Selection Logic
 
-The AI Redirector uses sophisticated analysis to route prompts:
+The 2DO uses sophisticated analysis to route prompts:
 
 ### Prompt Analysis Factors
 - **Code keywords**: Functions, classes, debugging, algorithms
@@ -246,18 +246,18 @@ When all four TALL stack components are detected:
 - **Laravel**: PHP web application framework  
 - **Livewire**: Laravel library for building dynamic interfaces
 
-AI Redirector provides specialized context and best practices for this modern PHP stack.
+2DO provides specialized context and best practices for this modern PHP stack.
 
 ## Configuration
 
 ### Global Configuration
-Configuration files are stored in `~/.ai_redirector/`:
+Configuration files are stored in `~/.2do/`:
 - `config.yaml`: Main configuration and API keys
 - `todos/todos.json`: Global todo items storage
 - `memory/`: Global tech stack memory files
 
 ### Local Project Configuration (2DO Folders)
-When working in a git repository, AI Redirector creates a local `2DO/` folder:
+When working in a git repository, 2DO creates a local `2DO/` folder:
 - `2DO/config.yaml`: Project-specific configuration
 - `2DO/todos/todos.json`: Project-specific todo items
 - `2DO/memory/`: Project-specific tech stack memory files
@@ -276,7 +276,7 @@ This allows you to:
 
 2. Configure during setup:
    ```bash
-   airedirector setup
+   2do setup
    # Enter your token when prompted for GitHub configuration
    ```
 

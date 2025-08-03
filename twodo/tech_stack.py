@@ -17,7 +17,7 @@ class TechStackDetector:
         if config_dir:
             self.memory_dir = Path(config_dir) / "memory"
         else:
-            self.memory_dir = Path.home() / ".ai_redirector" / "memory"
+            self.memory_dir = Path.home() / ".2do" / "memory"
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         
         # Define file patterns for different technologies
