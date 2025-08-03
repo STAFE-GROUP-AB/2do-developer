@@ -61,6 +61,9 @@ env.bak/
 venv.bak/
 test_env/
 
+# 2DO installation directories
+.2do/
+
 # IDEs
 .vscode/
 .idea/
