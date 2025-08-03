@@ -312,7 +312,8 @@ main() {
     echo ""
 }
 
-# Run main function only if script is executed directly (not sourced)
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# Run main function if script is executed directly (not sourced)
+# Handle both file execution and pipe execution (curl | bash)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]] || [[ -z "${BASH_SOURCE[0]}" ]]; then
     main "$@"
 fi
