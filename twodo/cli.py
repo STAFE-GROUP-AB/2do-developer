@@ -412,12 +412,36 @@ def handle_multitask(multitasker, todo_manager, browser_integration):
             console.print("🔄 Auto-refreshing browser...")
             browser_integration.refresh_browser()
 
+def show_chat_help():
+    """Display help information for chat commands"""
+    console.print("\n📖 Chat Help - Available Commands:")
+    console.print("=" * 50)
+    
+    # Chat-specific commands
+    console.print("\n🎯 Chat Commands:")
+    console.print("   ?        - Show this help")
+    console.print("   exit     - Return to main menu")
+    console.print("   image    - Load an image file manually")
+    
+    # AI and functionality info
+    console.print("\n🤖 AI Features:")
+    console.print("   • 2DO automatically chooses the best AI model for your prompt")
+    console.print("   • Supports image analysis - paste images from clipboard automatically")
+    console.print("   • Intelligent routing based on prompt complexity and type")
+    
+    # Tips
+    console.print("\n💡 Tips:")
+    console.print("   • Just type your question or request naturally")
+    console.print("   • Images from clipboard are detected automatically")
+    console.print("   • For image files, type 'image' to browse and select")
+    console.print("   • Use 'exit' to return to the main 2DO menu")
+    console.print("=" * 50)
+    console.print()
+
 def handle_chat(ai_router, image_handler):
     """Handle interactive chat with AI routing"""
-    console.print("💬 Chat mode - 2DO will choose the best model for your prompt")
-    console.print("🖼️  You can paste images from clipboard - they will be detected automatically")
-    console.print("📸 Or type 'image' to load an image file manually")
-    console.print("Type 'exit' to return to main menu\n")
+    console.print("💬 Chat")
+    console.print("💡 Type '?' for help or 'exit' to return to main menu\n")
     
     # Clean up old temporary files
     image_handler.cleanup_old_temp_files()
@@ -426,6 +450,9 @@ def handle_chat(ai_router, image_handler):
         prompt = Prompt.ask("You")
         if prompt.lower() == 'exit':
             break
+        elif prompt.strip() == '?':
+            show_chat_help()
+            continue
         
         # Check if user wants to work with images
         clipboard_image_path = None
