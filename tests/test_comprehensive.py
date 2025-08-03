@@ -396,8 +396,8 @@ class TestAIRouterComprehensive(unittest.TestCase):
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
     
-    @patch('twodo.ai_router.OpenAI')
-    @patch('twodo.ai_router.Anthropic')
+    @patch('twodo.ai_router.openai.OpenAI')
+    @patch('twodo.ai_router.anthropic.Anthropic')
     def test_ai_router_initialization(self, mock_anthropic, mock_openai):
         """Test AI router initialization with various configurations"""
         # Test with all providers
@@ -433,8 +433,8 @@ class TestAIRouterComprehensive(unittest.TestCase):
         self.assertIn("reasoning", gpt4_capability.strengths)
         self.assertEqual(gpt4_capability.context_length, 8192)
     
-    @patch('twodo.ai_router.OpenAI')
-    @patch('twodo.ai_router.Anthropic')
+    @patch('twodo.ai_router.openai.OpenAI')
+    @patch('twodo.ai_router.anthropic.Anthropic')
     def test_prompt_analysis(self, mock_anthropic, mock_openai):
         """Test prompt analysis for model selection"""
         router = AIRouter(self.config)
@@ -463,7 +463,7 @@ class TestAIRouterComprehensive(unittest.TestCase):
         # Define model capabilities for testing
         models = {
             "gpt-4": ModelCapability("gpt-4", "openai", ["reasoning", "complex"], 8192, 0.03, 7),
-            "claude-haiku": ModelCapability("claude-3-haiku", "anthropic", ["speed", "simple"], 200000, 0.0005, 10),
+            "claude-haiku": ModelCapability("claude-3-5-haiku-20241022", "anthropic", ["speed", "simple"], 200000, 0.0005, 10),
             "gpt-4-turbo": ModelCapability("gpt-4-turbo", "openai", ["code", "large_context"], 128000, 0.01, 8)
         }
         

@@ -66,29 +66,29 @@ class AIRouter:
         # Anthropic models
         if self.config.get_api_key("anthropic"):
             models.update({
-                "claude-3-opus": ModelCapability(
-                    name="claude-3-opus",
+                "claude-3-5-sonnet-20241022": ModelCapability(
+                    name="claude-3-5-sonnet-20241022",
                     provider="anthropic",
-                    strengths=["reasoning", "creative", "complex_analysis", "code"],
-                    context_length=200000,
-                    cost_per_token=0.015,
-                    speed_rating=5
-                ),
-                "claude-3-sonnet": ModelCapability(
-                    name="claude-3-sonnet",
-                    provider="anthropic",
-                    strengths=["balanced", "code", "analysis", "speed"],
+                    strengths=["reasoning", "creative", "complex_analysis", "code", "balanced"],
                     context_length=200000,
                     cost_per_token=0.003,
                     speed_rating=8
                 ),
-                "claude-3-haiku": ModelCapability(
-                    name="claude-3-haiku",
+                "claude-3-5-haiku-20241022": ModelCapability(
+                    name="claude-3-5-haiku-20241022",
                     provider="anthropic",
                     strengths=["speed", "simple_tasks", "quick_answers"],
                     context_length=200000,
                     cost_per_token=0.00025,
                     speed_rating=10
+                ),
+                "claude-3-opus-20240229": ModelCapability(
+                    name="claude-3-opus-20240229",
+                    provider="anthropic",
+                    strengths=["reasoning", "creative", "complex_analysis"],
+                    context_length=200000,
+                    cost_per_token=0.015,
+                    speed_rating=5
                 )
             })
         
@@ -195,41 +195,80 @@ class AIRouter:
     
     def route_and_process(self, prompt: str) -> str:
         """Route prompt to best model and process it"""
+        # Try the best model first
         try:
             model_name = self.select_best_model(prompt)
-            model = self.models[model_name]
-            
-            if model.provider == "openai":
-                return self._process_openai(model_name, prompt)
-            elif model.provider == "anthropic":
-                return self._process_anthropic(model_name, prompt)
-            else:
-                raise ValueError(f"Unsupported provider: {model.provider}")
-        
+            return self._process_with_model(model_name, prompt)
         except Exception as e:
-            console.print(f"❌ Error processing prompt: {str(e)}")
-            return f"Error: {str(e)}"
+            console.print(f"❌ Primary model failed: {str(e)}")
+            
+            # Try fallback models
+            fallback_models = [name for name in self.models.keys() if name != model_name]
+            for fallback_model in fallback_models:
+                try:
+                    console.print(f"🔄 Trying fallback model: {fallback_model}")
+                    return self._process_with_model(fallback_model, prompt)
+                except Exception as fallback_error:
+                    console.print(f"❌ Fallback model {fallback_model} failed: {str(fallback_error)}")
+                    continue
+            
+            # If all models fail, return error
+            console.print(f"❌ All models failed. Last error: {str(e)}")
+            return f"Error: All AI models are currently unavailable. Please check your API keys and try again."
+    
+    def _process_with_model(self, model_name: str, prompt: str) -> str:
+        """Process prompt with a specific model"""
+        model = self.models[model_name]
+        
+        if model.provider == "openai":
+            return self._process_openai(model_name, prompt)
+        elif model.provider == "anthropic":
+            return self._process_anthropic(model_name, prompt)
+        else:
+            raise ValueError(f"Unsupported provider: {model.provider}")
     
     def _process_openai(self, model_name: str, prompt: str) -> str:
         """Process prompt using OpenAI model"""
-        client = self.clients["openai"]
-        
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-        
-        return response.choices[0].message.content
+        try:
+            client = self.clients["openai"]
+            
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
+            )
+            
+            return response.choices[0].message.content
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "model" in error_msg.lower() and "not found" in error_msg.lower():
+                raise ValueError(f"Model '{model_name}' not found or unavailable in OpenAI API")
+            elif "401" in error_msg or "authentication" in error_msg.lower():
+                raise ValueError(f"Invalid OpenAI API key")
+            elif "429" in error_msg or "rate_limit" in error_msg.lower():
+                raise ValueError(f"Rate limit exceeded for OpenAI API")
+            else:
+                raise ValueError(f"OpenAI API error: {error_msg}")
     
     def _process_anthropic(self, model_name: str, prompt: str) -> str:
         """Process prompt using Anthropic model"""
-        client = self.clients["anthropic"]
-        
-        response = client.messages.create(
-            model=model_name,
-            max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        return response.content[0].text
+        try:
+            client = self.clients["anthropic"]
+            
+            response = client.messages.create(
+                model=model_name,
+                max_tokens=4000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            return response.content[0].text
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "not_found_error" in error_msg:
+                raise ValueError(f"Model '{model_name}' not found or unavailable in Anthropic API")
+            elif "401" in error_msg or "authentication" in error_msg.lower():
+                raise ValueError(f"Invalid Anthropic API key")
+            elif "429" in error_msg or "rate_limit" in error_msg.lower():
+                raise ValueError(f"Rate limit exceeded for Anthropic API")
+            else:
+                raise ValueError(f"Anthropic API error: {error_msg}")
