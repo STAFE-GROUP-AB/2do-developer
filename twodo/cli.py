@@ -21,6 +21,7 @@ from .multitasker import Multitasker
 from .tech_stack import TechStackDetector
 from .markdown_parser import MarkdownTaskParser
 from .github_integration import GitHubIntegration
+from .browser_integration import BrowserIntegration
 
 console = Console()
 
@@ -85,6 +86,7 @@ def start(repo):
     multitasker = Multitasker(ai_router)
     tech_detector = TechStackDetector(config_manager.config_dir)
     github_integration = GitHubIntegration(config_manager.get_api_key("github"))
+    browser_integration = BrowserIntegration(working_dir)
     
     # Get repository info if we're in a git repo
     repo_info = None
@@ -110,11 +112,19 @@ def start(repo):
         console.print("\n" + "="*50)
         choices = ["add-todo", "list-todos", "start-multitask", "parse-markdown", "chat", "quit"]
         
+        # Add browser options
+        browser_status = browser_integration.get_status()
+        if browser_status["active"]:
+            choices.insert(-2, "refresh-browser")  # Before chat and quit
+            choices.insert(-2, "stop-browser")
+        else:
+            choices.insert(-2, "start-browser")
+        
         # Add GitHub options if we have repository info
         if repo_info and github_integration.github:
-            choices.insert(-2, "github-issues")  # Before chat and quit
-            choices.insert(-2, "create-github-issue")
-            choices.insert(-2, "export-todos-to-github")
+            choices.insert(-3, "github-issues")  # Before browser and chat/quit
+            choices.insert(-3, "create-github-issue")
+            choices.insert(-3, "export-todos-to-github")
         
         action = Prompt.ask(
             "What would you like to do?",
@@ -123,15 +133,24 @@ def start(repo):
         )
         
         if action == "quit":
+            # Clean up browser integration before quitting
+            if browser_integration.is_active:
+                browser_integration.stop_browser_mode()
             break
         elif action == "add-todo":
             handle_add_todo(todo_manager)
         elif action == "list-todos":
             handle_list_todos(todo_manager)
         elif action == "start-multitask":
-            handle_multitask(multitasker, todo_manager)
+            handle_multitask(multitasker, todo_manager, browser_integration)
         elif action == "parse-markdown":
             handle_parse_markdown(todo_manager, working_dir)
+        elif action == "start-browser":
+            handle_start_browser(browser_integration)
+        elif action == "refresh-browser":
+            handle_refresh_browser(browser_integration)
+        elif action == "stop-browser":
+            handle_stop_browser(browser_integration)
         elif action == "github-issues":
             handle_github_issues(github_integration, todo_manager, repo_info, working_dir)
         elif action == "create-github-issue":
@@ -205,7 +224,7 @@ def handle_list_todos(todo_manager):
     
     console.print(table)
 
-def handle_multitask(multitasker, todo_manager):
+def handle_multitask(multitasker, todo_manager, browser_integration):
     """Start multitasking on todos"""
     todos = todo_manager.get_pending_todos()
     
@@ -218,6 +237,11 @@ def handle_multitask(multitasker, todo_manager):
     if Confirm.ask("Proceed with multitasking?"):
         multitasker.start_multitask(todos)
         console.print("✅ Multitasking completed!")
+        
+        # Auto-refresh browser if active
+        if browser_integration.is_active:
+            console.print("🔄 Auto-refreshing browser...")
+            browser_integration.refresh_browser()
 
 def handle_chat(ai_router):
     """Handle interactive chat with AI routing"""
@@ -456,6 +480,41 @@ def handle_export_todos_to_github(github_integration, todo_manager, repo_info):
         console.print(f"📋 Issues created: {', '.join(issue_numbers)}")
     else:
         console.print("❌ No issues were created")
+
+def handle_start_browser(browser_integration):
+    """Handle starting browser integration mode"""
+    if browser_integration.is_active:
+        console.print("🌐 Browser integration is already active!")
+        return
+    
+    console.print("🚀 Starting browser integration mode...")
+    
+    if browser_integration.start_browser_mode():
+        console.print("✅ Browser integration started successfully!")
+        console.print("💡 Your development server is now running and browser is open")
+        console.print("🔄 The browser will auto-refresh after completing tasks")
+    else:
+        console.print("❌ Failed to start browser integration")
+
+def handle_refresh_browser(browser_integration):
+    """Handle manual browser refresh"""
+    if not browser_integration.is_active:
+        console.print("❌ Browser integration is not active. Start it first.")
+        return
+    
+    console.print("🔄 Refreshing browser...")
+    browser_integration.refresh_browser()
+    console.print("✅ Browser refresh signal sent")
+
+def handle_stop_browser(browser_integration):
+    """Handle stopping browser integration mode"""
+    if not browser_integration.is_active:
+        console.print("❌ Browser integration is not currently active")
+        return
+    
+    if Confirm.ask("Stop browser integration mode?"):
+        browser_integration.stop_browser_mode()
+        console.print("✅ Browser integration stopped")
 
 def main():
     """Main entry point"""

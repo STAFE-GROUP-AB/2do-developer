@@ -15,6 +15,8 @@ setup(
         "rich>=13.0.0",
         "PyGithub>=2.0.0",
         "GitPython>=3.1.0",
+        "playwright>=1.40.0",
+        "psutil>=5.9.0",
     ],
     entry_points={
         "console_scripts": [
