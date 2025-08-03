@@ -11,7 +11,7 @@ from typing import Dict, Optional
 class ConfigManager:
     """Manages configuration and API keys for AI models"""
     
-    def __init__(self, project_dir=None):
+    def __init__(self, project_dir=None, suppress_prompts=False):
         # If project_dir is provided and is a git repo, use local 2DO folder
         if project_dir and self._is_git_repo(project_dir):
             self.config_dir = Path(project_dir) / "2DO"
@@ -21,6 +21,9 @@ class ConfigManager:
             self.is_local_project = False
             
         self.config_file = self.config_dir / "config.yaml"
+        self.global_config_dir = Path.home() / ".2do"
+        self.global_config_file = self.global_config_dir / "config.yaml"
+        self.suppress_prompts = suppress_prompts
         
         # Ensure config directory exists with proper error handling
         try:
@@ -58,6 +61,123 @@ class ConfigManager:
                 "mcp_servers": []
             }
             self._save_config()
+        
+        # Check if local config is empty or missing keys and global config has values
+        if self.is_local_project:
+            self._handle_local_config_fallback()
+    
+    def _handle_local_config_fallback(self):
+        """Handle fallback to global config when local config is empty or missing keys"""
+        # Skip if prompts are suppressed
+        if self.suppress_prompts:
+            return
+            
+        # Check if local config has any meaningful API keys
+        local_has_keys = self._config_has_api_keys(self.config)
+        
+        # Load global config to check if it has keys
+        global_config = self._load_global_config()
+        global_has_keys = global_config and self._config_has_api_keys(global_config)
+        
+        # If local doesn't have keys but global does, offer to copy or use global
+        if not local_has_keys and global_has_keys:
+            self._prompt_for_global_config_usage(global_config)
+    
+    def _config_has_api_keys(self, config):
+        """Check if config has any non-empty API keys"""
+        api_keys = config.get("api_keys", {})
+        return any(
+            key and str(key).strip() and str(key).strip().lower() not in ['null', 'none', '']
+            for key in api_keys.values()
+        )
+    
+    def _load_global_config(self):
+        """Load global config from home directory"""
+        if not self.global_config_file.exists():
+            return None
+        
+        try:
+            with open(self.global_config_file, 'r') as f:
+                return yaml.safe_load(f) or {}
+        except Exception:
+            return None
+    
+    def _prompt_for_global_config_usage(self, global_config):
+        """Prompt user to copy global config or use global values"""
+        try:
+            from rich.console import Console
+            from rich.prompt import Confirm, Prompt
+            from rich.panel import Panel
+            
+            console = Console()
+            
+            # Show what keys are available in global config
+            global_keys = [
+                key for key, value in global_config.get("api_keys", {}).items()
+                if value and str(value).strip() and str(value).strip().lower() not in ['null', 'none', '']
+            ]
+            
+            if not global_keys:
+                return
+            
+            console.print(Panel(
+                f"📁 Local 2DO config is empty, but global config has API keys:\n"
+                f"   {', '.join(global_keys)}\n\n"
+                f"Local config: {self.config_file}\n"
+                f"Global config: {self.global_config_file}",
+                title="🔑 Configuration Found",
+                style="yellow"
+            ))
+            
+            # Check for non-interactive mode (for testing)
+            if os.environ.get('TWODO_NON_INTERACTIVE') == '1':
+                # In non-interactive mode, default to copying global config
+                self._copy_global_to_local(global_config)
+                console.print("✅ Global configuration copied to local project (non-interactive mode)")
+                return
+            
+            choice = Prompt.ask(
+                "What would you like to do?",
+                choices=["copy", "global", "skip"],
+                default="copy"
+            )
+            
+            if choice == "copy":
+                self._copy_global_to_local(global_config)
+                console.print("✅ Global configuration copied to local project")
+            elif choice == "global":
+                console.print("✅ Will use global configuration")
+                # Use global config but don't modify local file
+                self.config = global_config
+            else:
+                console.print("⏭️ Keeping empty local configuration")
+                
+        except ImportError:
+            # If rich is not available, just copy the config silently
+            self._copy_global_to_local(global_config)
+        except Exception:
+            # If prompting fails for any reason, silently fall back to local config
+            pass
+    
+    def _copy_global_to_local(self, global_config):
+        """Copy global config values to local config"""
+        # Copy API keys
+        if "api_keys" in global_config:
+            self.config["api_keys"] = global_config["api_keys"].copy()
+        
+        # Copy preferences (merge with existing)
+        if "preferences" in global_config:
+            self.config.setdefault("preferences", {})
+            for key, value in global_config["preferences"].items():
+                # Only copy if local doesn't already have a value
+                if key not in self.config["preferences"]:
+                    self.config["preferences"][key] = value
+        
+        # Copy MCP servers
+        if "mcp_servers" in global_config:
+            self.config["mcp_servers"] = global_config["mcp_servers"].copy()
+        
+        self._save_config()
     
     def _save_config(self):
         """Save configuration to file"""
