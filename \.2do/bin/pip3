@@ -1,4 +1,4 @@
-#!/home/runner/work/2do-developer/2do-developer/\.2do/bin/python3.12
+#!/home/runner/work/2do-developer/2do-developer/\.2do/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys
