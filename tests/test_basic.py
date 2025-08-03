@@ -7,10 +7,12 @@ import unittest
 import tempfile
 import os
 from pathlib import Path
+from PIL import Image, ImageDraw
 
 from twodo.config import ConfigManager
 from twodo.todo_manager import TodoManager
 from twodo.tech_stack import TechStackDetector
+from twodo.image_handler import ImageHandler
 
 class Test2DO(unittest.TestCase):
     """Basic tests for core functionality"""
@@ -297,6 +299,43 @@ class Test2DO(unittest.TestCase):
         title = "Update   documentation    files"
         sanitized = github_integration._sanitize_branch_name(title)
         self.assertEqual(sanitized, "update-documentation-files")
+    
+    def test_image_handler(self):
+        """Test image handling functionality"""
+        handler = ImageHandler()
+        
+        # Create a test image
+        test_image = Image.new('RGB', (100, 50), color=(255, 0, 0))
+        draw = ImageDraw.Draw(test_image)
+        draw.text((10, 20), "Test", fill=(255, 255, 255))
+        
+        # Test ASCII preview creation
+        ascii_preview = handler.create_ascii_preview(test_image, 20, 5)
+        self.assertIsInstance(ascii_preview, str)
+        self.assertGreater(len(ascii_preview), 0)
+        
+        # Test temporary image saving
+        temp_path = handler.save_image_temporarily(test_image, "test")
+        self.assertTrue(os.path.exists(temp_path))
+        self.assertTrue(temp_path.endswith('.png'))
+        
+        # Test saved image can be loaded
+        saved_image = Image.open(temp_path)
+        self.assertEqual(saved_image.size, test_image.size)
+        
+        # Test clipboard detection (will return None since no image in clipboard)
+        clipboard_image = handler.check_clipboard_for_image()
+        # This should return None in test environment
+        self.assertIsNone(clipboard_image)
+        
+        # Test file path detection
+        self.assertTrue(handler._is_image_file_path(temp_path))
+        self.assertFalse(handler._is_image_file_path("not_an_image.txt"))
+        self.assertFalse(handler._is_image_file_path("/nonexistent/path.jpg"))
+        
+        # Clean up
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 if __name__ == '__main__':
     unittest.main()
