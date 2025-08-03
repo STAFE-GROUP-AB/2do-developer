@@ -246,7 +246,7 @@ def start(repo):
     # Interactive session
     while True:
         console.print("\n" + "="*50)
-        choices = ["add-todo", "list-todos", "create-subtasks", "start-multitask", "parse-markdown", "chat", "quit"]
+        choices = ["add-todo", "list-todos", "create-subtasks", "start-multitask", "parse-markdown", "manage-mcp", "chat", "quit"]
         
         # Add browser options
         browser_status = browser_integration.get_status()
@@ -283,6 +283,8 @@ def start(repo):
             handle_multitask(multitasker, todo_manager, browser_integration)
         elif action == "parse-markdown":
             handle_parse_markdown(todo_manager, working_dir)
+        elif action == "manage-mcp":
+            handle_manage_mcp(config_manager, working_dir)
         elif action == "start-browser":
             handle_start_browser(browser_integration)
         elif action == "refresh-browser":
@@ -620,6 +622,46 @@ def handle_parse_markdown(todo_manager, working_dir):
         
         todo_ids = parser.create_todos_from_tasks(tasks, todo_manager, priority)
         console.print(f"✅ Created {len(todo_ids)} todos from markdown tasks")
+
+def handle_manage_mcp(config_manager, working_dir):
+    """Handle MCP server management in interactive mode"""
+    try:
+        console.print("\n🔌 MCP Server Management")
+        
+        # Initialize MCP manager
+        tech_stack_detector = TechStackDetector(config_manager.config_dir)
+        mcp_manager = MCPServerManager(config_manager, tech_stack_detector)
+        
+        # Show options
+        action = Prompt.ask(
+            "What would you like to do?",
+            choices=["recommend", "configure", "list", "back"],
+            default="recommend"
+        )
+        
+        if action == "back":
+            return
+        elif action == "recommend":
+            # Show recommendations only
+            recommended_servers = mcp_manager.run_tech_stack_analysis_and_recommend(working_dir)
+            if recommended_servers:
+                mcp_manager.display_recommended_servers(recommended_servers)
+            else:
+                console.print("No recommendations available.")
+        elif action == "configure":
+            # Run full interactive setup
+            success = mcp_manager.setup_mcp_servers_interactive(working_dir)
+            if success:
+                console.print("✅ MCP servers configured successfully!")
+            else:
+                console.print("⚠️ MCP server configuration cancelled or failed")
+        elif action == "list":
+            # List configured servers
+            mcp_manager.list_configured_servers()
+            
+    except Exception as e:
+        console.print(f"❌ Error in MCP management: {e}")
+        console.print("💡 You may need to run '2do setup' first")
 
 def handle_github_issues(github_integration, todo_manager, repo_info, working_dir):
     """Handle GitHub issues operations"""
