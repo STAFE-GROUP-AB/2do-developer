@@ -9,6 +9,13 @@
 - Supports multiple AI providers (OpenAI, Anthropic, and more)
 - Optimizes for speed, cost, and task complexity
 
+### 🌐 Browser Integration
+- Start browser interactive mode alongside the terminal
+- Automatically detects project type and starts appropriate development server
+- Opens browser with your project running in real-time
+- Auto-refreshes browser after task completion for immediate visual feedback
+- Supports React, Vue, Angular, Laravel, Django, Flask, and static HTML projects
+
 ### 📋 Advanced Todo Management
 - Create and manage todos for codebases and projects
 - Support for text, code, image, and general task types
@@ -102,9 +109,12 @@ cd /path/to/your/git/project
 
 #### Interactive Session Features
 - **add-todo**: Create new todo items with different types and priorities
-- **list-todos**: View all todos in a formatted table with sub-task hierarchy
+- **list-todos**: View all todos in a formatted table
+- **start-multitask**: Process all pending todos in parallel
+- **start-browser**: Start browser integration mode with auto-detection
+- **refresh-browser**: Manually refresh the browser (when browser mode is active)
+- **stop-browser**: Stop browser integration and development server
 - **🆕 create-subtasks**: Break down large todos into manageable sub-tasks
-- **start-multitask**: Process all pending todos in parallel (with sub-task awareness)
 - **parse-markdown**: Extract tasks from markdown files and convert to todos
 - **github-issues**: Work with GitHub issues (list, work on, create todos from issues)
 - **create-github-issue**: Create new GitHub issues directly
@@ -127,6 +137,25 @@ cd /path/to/your/git/project
 # 2. Create a local "2DO" folder for project-specific settings
 # 3. Store todos, memory files, and configuration locally
 # 4. Detect GitHub repository information if available
+```
+
+### Browser Integration Mode
+```bash
+# Start 2DO in a project directory
+cd /path/to/your/web/project
+2do start
+
+# In the interactive session:
+# 1. Choose "start-browser" to:
+#    - Auto-detect your project type (React, Laravel, Django, etc.)
+#    - Start the appropriate development server
+#    - Open your browser automatically
+#    - Enable auto-refresh after task completion
+
+# 2. Work on your todos and see changes in real-time
+# 3. After multitasking, the browser refreshes automatically
+# 4. Use "refresh-browser" for manual refresh
+# 5. Use "stop-browser" to clean up
 ```
 
 ### Repository Analysis and Todo Generation
@@ -284,6 +313,24 @@ When all four TALL stack components are detected:
 - **Livewire**: Laravel library for building dynamic interfaces
 
 2DO provides specialized context and best practices for this modern PHP stack.
+
+### Browser Integration Project Support
+2DO automatically detects and supports:
+- **React**: Uses `npm start` or `npm run dev` (port 3000)
+- **Vue.js**: Uses `npm run serve` or `npm run dev` (port 8080)
+- **Angular**: Uses `npm start` or `npm run serve` (port 4200)
+- **Next.js**: Uses `npm run dev` (port 3000)
+- **Vite**: Uses `npm run dev` (port 5173)
+- **Laravel**: Uses `php artisan serve` (port 8000)
+- **Django**: Uses `python manage.py runserver` (port 8000)
+- **Flask**: Auto-detects Flask apps and runs with Python (port 5000)
+- **Static HTML**: Uses Python's built-in HTTP server (port 8080)
+
+The browser integration automatically:
+1. Detects your project type based on files and dependencies
+2. Starts the appropriate development server
+3. Opens your default browser to the running application
+4. Refreshes the browser after completing todos or multitasking
 
 ## Configuration
 

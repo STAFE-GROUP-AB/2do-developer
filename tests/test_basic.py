@@ -218,6 +218,65 @@ class Test2DO(unittest.TestCase):
         info = github_integration._parse_github_url(invalid_url)
         self.assertIsNone(info)
     
+    def test_browser_integration_detection(self):
+        """Test browser integration project detection"""
+        from twodo.browser_integration import BrowserIntegration
+        
+        # Test with a temporary React project
+        test_repo = Path(self.temp_dir) / "react_project"
+        test_repo.mkdir()
+        
+        package_json = test_repo / "package.json"
+        package_json.write_text('''{
+            "dependencies": {
+                "react": "^18.0.0"
+            },
+            "scripts": {
+                "start": "react-scripts start"
+            }
+        }''')
+        
+        browser_integration = BrowserIntegration(str(test_repo))
+        project_info = browser_integration.detect_project_type()
+        
+        self.assertEqual(project_info['type'], 'react')
+        self.assertEqual(project_info['server_port'], 3000)
+        self.assertEqual(project_info['server_command'], ['npm', 'start'])
+    
+    def test_browser_integration_static_detection(self):
+        """Test browser integration static HTML detection"""
+        from twodo.browser_integration import BrowserIntegration
+        
+        # Test with a static HTML project
+        test_repo = Path(self.temp_dir) / "static_project"
+        test_repo.mkdir()
+        
+        html_file = test_repo / "index.html"
+        html_file.write_text('<html><body>Test</body></html>')
+        
+        browser_integration = BrowserIntegration(str(test_repo))
+        project_info = browser_integration.detect_project_type()
+        
+        self.assertEqual(project_info['type'], 'static')
+        self.assertEqual(project_info['server_port'], 8080)
+    
+    def test_browser_integration_status(self):
+        """Test browser integration status tracking"""
+        from twodo.browser_integration import BrowserIntegration
+        
+        browser_integration = BrowserIntegration()
+        
+        # Test initial status
+        status = browser_integration.get_status()
+        self.assertFalse(status['active'])
+        self.assertFalse(status['server_running'])
+        self.assertIsNone(status['server_url'])
+        
+        # Test port finding functionality
+        port = browser_integration.find_free_port(8080)
+        self.assertIsInstance(port, int)
+        self.assertGreaterEqual(port, 8080)
+    
     def test_branch_name_sanitization(self):
         """Test branch name sanitization for GitHub issues"""
         from twodo.github_integration import GitHubIntegration
