@@ -21,7 +21,20 @@ class ConfigManager:
             self.is_local_project = False
             
         self.config_file = self.config_dir / "config.yaml"
-        self.config_dir.mkdir(exist_ok=True)
+        
+        # Ensure config directory exists with proper error handling
+        try:
+            self.config_dir.mkdir(exist_ok=True)
+        except (OSError, PermissionError) as e:
+            # Fallback to home directory if we can't create the config directory
+            if self.is_local_project:
+                self.config_dir = Path.home() / ".2do"
+                self.config_file = self.config_dir / "config.yaml"
+                self.is_local_project = False
+                self.config_dir.mkdir(exist_ok=True)
+            else:
+                raise
+        
         self._load_config()
     
     def _is_git_repo(self, path):
