@@ -20,9 +20,12 @@
 - Create and manage todos for codebases and projects
 - Support for text, code, image, and general task types
 - Priority-based organization (low, medium, high, critical)
+- **🆕 Automatic sub-task creation for large/complex todos**
+- **🆕 AI-powered task breakdown with intelligent analysis**
+- **🆕 Parent-child todo relationships and hierarchy display**
 - Automatic todo generation from repository analysis
 - Import tasks from markdown files
-- Export todos as GitHub issues
+- Export todos as GitHub issues (with sub-task support)
 
 ### ⚡ Multitasking Engine
 - Process multiple todos in parallel using optimal AI models
@@ -111,10 +114,11 @@ cd /path/to/your/git/project
 - **start-browser**: Start browser integration mode with auto-detection
 - **refresh-browser**: Manually refresh the browser (when browser mode is active)
 - **stop-browser**: Stop browser integration and development server
+- **🆕 create-subtasks**: Break down large todos into manageable sub-tasks
 - **parse-markdown**: Extract tasks from markdown files and convert to todos
 - **github-issues**: Work with GitHub issues (list, work on, create todos from issues)
 - **create-github-issue**: Create new GitHub issues directly
-- **export-todos-to-github**: Export your todos as GitHub issues
+- **export-todos-to-github**: Export your todos as GitHub issues (with sub-task linking)
 - **chat**: Interactive chat with intelligent AI model routing (supports images)
 - **quit**: Exit the session
 
@@ -227,6 +231,39 @@ Todo type: image
 Priority: low
 Content: Path to image file
 ```
+
+### 🆕 Sub-task Management
+2DO automatically detects large or complex todos and can break them down into manageable sub-tasks:
+
+```bash
+# When adding a large todo, 2DO will prompt:
+# "🔍 This todo appears to be quite large and complex."
+# "Would you like to automatically break it down into sub-tasks?"
+
+# Manual sub-task creation
+# 1. Select "create-subtasks" from the menu
+# 2. Choose a todo from the list
+# 3. AI will analyze and create 3-5 sub-tasks
+
+# Sub-tasks are displayed hierarchically:
+# 📁 Build web application (with 4 sub-tasks)
+#   ├─ Plan & Design - Planning phase
+#   ├─ Core Implementation - Main development  
+#   ├─ Testing - Testing and validation
+#   └─ Documentation - Documentation and guides
+```
+
+#### Sub-task Detection Criteria
+2DO identifies large/complex todos based on:
+- **Content length**: Over 500 characters
+- **Complexity keywords**: "comprehensive", "complete", "system", "platform", etc.
+- **Multiple actions**: Presence of connecting words indicating multiple steps
+
+#### GitHub Integration with Sub-tasks
+When exporting todos to GitHub, you can choose:
+- **parent-only**: Export only the main todo
+- **with-subtasks**: Include sub-tasks in the description
+- **subtasks-as-issues**: Create separate linked GitHub issues for each sub-task
 
 ### Multitasking Processing
 When you start multitasking, the 2DO:

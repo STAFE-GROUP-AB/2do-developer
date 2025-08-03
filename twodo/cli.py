@@ -23,6 +23,9 @@ from .markdown_parser import MarkdownTaskParser
 from .github_integration import GitHubIntegration
 from .browser_integration import BrowserIntegration
 
+from .setup_guide import SetupGuide
+
+
 console = Console()
 
 @click.group()
@@ -60,6 +63,26 @@ def setup():
         console.print("✅ GitHub configured")
     
     console.print("\n🎉 Setup complete! You can now use '2do start' to begin.")
+
+@cli.command()
+@click.option('--project', '-p', help='Project directory to verify (default: current directory)')
+def verify(project):
+    """Verify 2DO setup and guide through missing components"""
+    console.print(Panel.fit("🔍 2DO Setup Verification", style="bold cyan"))
+    
+    project_dir = project if project else os.getcwd()
+    
+    # Run comprehensive setup verification
+    guide = SetupGuide(console)
+    setup_status = guide.run_complete_setup_check(project_dir)
+    
+    # Return appropriate exit code
+    if setup_status.get("is_fully_configured", False):
+        console.print("\n✅ Verification complete: 2DO is ready to use!")
+        return True
+    else:
+        console.print("\n⚠️ Verification complete: Some components need configuration")
+        return False
 
 @cli.command()
 @click.option('--repo', '-r', help='GitHub repository or local path to analyze')
@@ -110,7 +133,7 @@ def start(repo):
     # Interactive session
     while True:
         console.print("\n" + "="*50)
-        choices = ["add-todo", "list-todos", "start-multitask", "parse-markdown", "chat", "quit"]
+        choices = ["add-todo", "list-todos", "create-subtasks", "start-multitask", "parse-markdown", "chat", "quit"]
         
         # Add browser options
         browser_status = browser_integration.get_status()
@@ -138,9 +161,11 @@ def start(repo):
                 browser_integration.stop_browser_mode()
             break
         elif action == "add-todo":
-            handle_add_todo(todo_manager)
+            handle_add_todo(todo_manager, ai_router)
         elif action == "list-todos":
             handle_list_todos(todo_manager)
+        elif action == "create-subtasks":
+            handle_create_subtasks(todo_manager, ai_router)
         elif action == "start-multitask":
             handle_multitask(multitasker, todo_manager, browser_integration)
         elif action == "parse-markdown":
@@ -161,7 +186,7 @@ def start(repo):
         elif action == "chat":
             handle_chat(ai_router)
 
-def handle_add_todo(todo_manager):
+def handle_add_todo(todo_manager, ai_router):
     """Handle adding a new todo item"""
     title = Prompt.ask("Todo title")
     description = Prompt.ask("Description (optional)", default="")
@@ -195,8 +220,18 @@ def handle_add_todo(todo_manager):
         if file_path and os.path.exists(file_path):
             content = file_path
     
-    todo_manager.add_todo(title, description, todo_type, priority, content)
+    todo_id = todo_manager.add_todo(title, description, todo_type, priority, content)
     console.print("✅ Todo added successfully!")
+    
+    # Check if todo should be broken down into sub-tasks
+    todo = todo_manager.get_todo_by_id(todo_id)
+    if todo and todo_manager.is_todo_too_large(todo):
+        console.print("🔍 This todo appears to be quite large and complex.")
+        if Confirm.ask("Would you like to automatically break it down into sub-tasks?"):
+            sub_task_ids = todo_manager.create_sub_tasks_from_todo(todo_id, ai_router)
+            if sub_task_ids:
+                console.print(f"✅ Created {len(sub_task_ids)} sub-tasks!")
+                console.print("💡 Use 'list-todos' to see the sub-tasks.")
 
 def handle_list_todos(todo_manager):
     """Display all todos in a nice table"""
@@ -212,14 +247,49 @@ def handle_list_todos(todo_manager):
     table.add_column("Type", style="yellow")
     table.add_column("Priority", style="red")
     table.add_column("Status", style="blue")
+    table.add_column("Relation", style="magenta")
     
-    for todo in todos:
+    # Sort todos to show parent tasks first, then their sub-tasks
+    parent_todos = [todo for todo in todos if not todo.get("parent_id")]
+    sub_todos = [todo for todo in todos if todo.get("parent_id")]
+    
+    for todo in parent_todos:
+        # Show parent todo
+        relation = ""
+        if todo.get("sub_task_ids") and len(todo.get("sub_task_ids", [])) > 0:
+            relation = f"📁 {len(todo['sub_task_ids'])} sub-tasks"
+        
         table.add_row(
             str(todo["id"]),
             todo["title"],
-            todo["type"],
+            todo["todo_type"],
             todo["priority"],
-            todo["status"]
+            todo["status"],
+            relation
+        )
+        
+        # Show its sub-tasks right after
+        for sub_todo in sub_todos:
+            if sub_todo.get("parent_id") == todo["id"]:
+                table.add_row(
+                    str(sub_todo["id"]),
+                    f"  ├─ {sub_todo['title']}",  # Indent sub-tasks
+                    sub_todo["todo_type"],
+                    sub_todo["priority"],
+                    sub_todo["status"],
+                    "📎 sub-task"
+                )
+    
+    # Show any orphaned sub-tasks (shouldn't happen but just in case)
+    orphaned_subs = [todo for todo in sub_todos if not any(p["id"] == todo.get("parent_id") for p in parent_todos)]
+    for todo in orphaned_subs:
+        table.add_row(
+            str(todo["id"]),
+            todo["title"],
+            todo["todo_type"],
+            todo["priority"],
+            todo["status"],
+            "⚠️ orphaned"
         )
     
     console.print(table)
@@ -421,65 +491,126 @@ def handle_create_github_issue(github_integration, repo_info):
         console.print("❌ Failed to create issue")
 
 def handle_export_todos_to_github(github_integration, todo_manager, repo_info):
-    """Export todos as GitHub issues"""
+    """Export todos as GitHub issues with sub-task support"""
     pending_todos = todo_manager.get_pending_todos()
     
     if not pending_todos:
         console.print("📝 No pending todos to export")
         return
     
-    console.print(f"📋 Found {len(pending_todos)} pending todos")
+    # Separate parent todos from sub-tasks for better organization
+    parent_todos = [todo for todo in pending_todos if not todo.get("parent_id")]
+    sub_todos = [todo for todo in pending_todos if todo.get("parent_id")]
+    
+    console.print(f"📋 Found {len(pending_todos)} pending todos:")
+    console.print(f"   📁 {len(parent_todos)} parent todos")
+    console.print(f"   📎 {len(sub_todos)} sub-tasks")
     
     # Show preview
-    for i, todo in enumerate(pending_todos[:5], 1):
-        console.print(f"   {i}. {todo['title']}")
+    for i, todo in enumerate(parent_todos[:5], 1):
+        sub_count = len(todo.get("sub_task_ids", []))
+        sub_info = f" (with {sub_count} sub-tasks)" if sub_count > 0 else ""
+        console.print(f"   {i}. {todo['title']}{sub_info}")
     
-    if len(pending_todos) > 5:
-        console.print(f"   ... and {len(pending_todos) - 5} more")
+    if len(parent_todos) > 5:
+        console.print(f"   ... and {len(parent_todos) - 5} more parent todos")
     
-    if not Confirm.ask(f"Export {len(pending_todos)} todos as GitHub issues?"):
+    # Ask user preference for handling sub-tasks
+    export_option = "parent-only"
+    if any(len(todo.get("sub_task_ids", [])) > 0 for todo in parent_todos):
+        export_option = Prompt.ask(
+            "How would you like to handle todos with sub-tasks?",
+            choices=["parent-only", "with-subtasks", "subtasks-as-issues"],
+            default="with-subtasks"
+        )
+    
+    if not Confirm.ask(f"Export {len(parent_todos)} parent todos as GitHub issues?"):
         return
     
     # Export todos
     created_issues = []
-    for todo in pending_todos:
-        # Create issue body from todo
-        body = f"{todo['description']}\n\n"
-        if todo['content']:
-            body += f"**Details:**\n{todo['content']}\n\n"
-        body += f"**Priority:** {todo['priority']}\n"
-        body += f"**Type:** {todo['todo_type']}\n"
-        body += f"**Created:** {todo['created_at']}"
-        
-        # Create labels based on todo type and priority
-        labels = [f"priority-{todo['priority']}", f"type-{todo['todo_type']}"]
-        
-        issue_info = github_integration.create_issue(
-            repo_info['owner'], 
-            repo_info['repo_name'], 
-            todo['title'], 
-            body, 
-            labels
-        )
-        
-        if issue_info:
-            created_issues.append(issue_info)
-            # Update todo with GitHub issue reference
-            todo_manager.update_todo_status(
-                todo['id'], 
-                "completed", 
-                f"Exported as GitHub issue #{issue_info['number']}: {issue_info['url']}"
+    total_issues_created = 0
+    
+    for todo in parent_todos:
+        if export_option == "subtasks-as-issues" and len(todo.get("sub_task_ids", [])) > 0:
+            # Use the new sub-task aware export function
+            result = github_integration.export_todo_with_subtasks_to_github(
+                repo_info['owner'], 
+                repo_info['repo_name'], 
+                todo, 
+                todo_manager
             )
-            console.print(f"✅ Created issue #{issue_info['number']}: {todo['title']}")
+            
+            if result['success']:
+                created_issues.append(result['parent_issue'])
+                total_issues_created += 1 + len(result['sub_issues'])
+                
+                # Update parent todo status
+                todo_manager.update_todo_status(
+                    todo['id'], 
+                    "completed", 
+                    f"Exported as GitHub issue #{result['parent_issue']['number']}: {result['parent_issue']['url']}"
+                )
+                
+                # Update sub-task statuses
+                for sub_issue in result['sub_issues']:
+                    todo_manager.update_todo_status(
+                        sub_issue['todo_id'],
+                        "completed",
+                        f"Exported as GitHub issue #{sub_issue['issue_number']}: {sub_issue['issue_url']}"
+                    )
         else:
-            console.print(f"❌ Failed to create issue for: {todo['title']}")
+            # Traditional export (with or without sub-task info in description)
+            body = f"{todo['description']}\n\n"
+            if todo['content']:
+                body += f"**Details:**\n{todo['content']}\n\n"
+            
+            # Include sub-task information if requested
+            if export_option == "with-subtasks":
+                sub_tasks = todo_manager.get_sub_tasks(todo['id'])
+                if sub_tasks:
+                    body += f"**Sub-tasks ({len(sub_tasks)} items):**\n"
+                    for i, sub_task in enumerate(sub_tasks, 1):
+                        body += f"{i}. {sub_task['title']} - {sub_task['description']}\n"
+                    body += "\n"
+            
+            body += f"**Priority:** {todo['priority']}\n"
+            body += f"**Type:** {todo['todo_type']}\n"
+            body += f"**Created:** {todo['created_at']}"
+            
+            # Create labels based on todo type and priority
+            labels = [f"priority-{todo['priority']}", f"type-{todo['todo_type']}"]
+            if len(todo.get("sub_task_ids", [])) > 0:
+                labels.append("has-subtasks")
+            
+            issue_info = github_integration.create_issue(
+                repo_info['owner'], 
+                repo_info['repo_name'], 
+                todo['title'], 
+                body, 
+                labels
+            )
+            
+            if issue_info:
+                created_issues.append(issue_info)
+                total_issues_created += 1
+                # Update todo with GitHub issue reference
+                todo_manager.update_todo_status(
+                    todo['id'], 
+                    "completed", 
+                    f"Exported as GitHub issue #{issue_info['number']}: {issue_info['url']}"
+                )
+                console.print(f"✅ Created issue #{issue_info['number']}: {todo['title']}")
+            else:
+                console.print(f"❌ Failed to create issue for: {todo['title']}")
     
     if created_issues:
-        console.print(f"\n🎉 Successfully exported {len(created_issues)} todos as GitHub issues!")
-        issue_numbers = [f"#{issue['number']}" for issue in created_issues]
-        console.print(f"📋 Issues created: {', '.join(issue_numbers)}")
+        console.print(f"\n🎉 Successfully exported {len(parent_todos)} todos as {total_issues_created} GitHub issues!")
+        issue_numbers = [f"#{issue['number']}" for issue in created_issues if isinstance(issue, dict)]
+        console.print(f"📋 Parent issues created: {', '.join(issue_numbers)}")
     else:
         console.print("❌ No issues were created")
+
 
 def handle_start_browser(browser_integration):
     """Handle starting browser integration mode"""
@@ -515,6 +646,68 @@ def handle_stop_browser(browser_integration):
     if Confirm.ask("Stop browser integration mode?"):
         browser_integration.stop_browser_mode()
         console.print("✅ Browser integration stopped")
+
+def handle_create_subtasks(todo_manager, ai_router):
+    """Handle manual sub-task creation for existing todos"""
+    todos = todo_manager.get_todos()
+    
+    # Filter to show only parent todos (no sub-tasks) that don't already have sub-tasks
+    candidate_todos = [
+        todo for todo in todos 
+        if not todo.get("parent_id") and len(todo.get("sub_task_ids", [])) == 0
+    ]
+    
+    if not candidate_todos:
+        console.print("📝 No eligible todos found for sub-task creation.")
+        console.print("💡 Eligible todos are those without existing sub-tasks.")
+        return
+    
+    console.print("\n📋 Todos that can be broken down into sub-tasks:")
+    table = Table()
+    table.add_column("ID", style="cyan")
+    table.add_column("Title", style="green")
+    table.add_column("Size Analysis", style="yellow")
+    
+    for todo in candidate_todos:
+        is_large = todo_manager.is_todo_too_large(todo)
+        size_status = "🔍 Large/Complex" if is_large else "📏 Normal size"
+        table.add_row(str(todo["id"]), todo["title"][:50] + "..." if len(todo["title"]) > 50 else todo["title"], size_status)
+    
+    console.print(table)
+    
+    todo_id = Prompt.ask("\nEnter the ID of the todo to break down")
+    
+    selected_todo = todo_manager.get_todo_by_id(todo_id)
+    if not selected_todo:
+        console.print("❌ Todo not found")
+        return
+    
+    if selected_todo.get("parent_id"):
+        console.print("❌ Cannot create sub-tasks for a sub-task")
+        return
+    
+    if len(selected_todo.get("sub_task_ids", [])) > 0:
+        console.print("❌ This todo already has sub-tasks")
+        return
+    
+    console.print(f"\n📝 Breaking down: {selected_todo['title']}")
+    
+    # Create sub-tasks
+    sub_task_ids = todo_manager.create_sub_tasks_from_todo(todo_id, ai_router)
+    
+    if sub_task_ids:
+        console.print(f"✅ Created {len(sub_task_ids)} sub-tasks!")
+        console.print("💡 Use 'list-todos' to see the sub-tasks.")
+        
+        # Show the created sub-tasks
+        sub_tasks = todo_manager.get_sub_tasks(todo_id)
+        if sub_tasks:
+            console.print("\n📋 Created sub-tasks:")
+            for i, sub_task in enumerate(sub_tasks, 1):
+                console.print(f"   {i}. {sub_task['title']}")
+    else:
+        console.print("❌ Failed to create sub-tasks")
+
 
 def main():
     """Main entry point"""
