@@ -21,6 +21,7 @@ from .multitasker import Multitasker
 from .tech_stack import TechStackDetector
 from .markdown_parser import MarkdownTaskParser
 from .github_integration import GitHubIntegration
+from .setup_guide import SetupGuide
 
 console = Console()
 
@@ -59,6 +60,26 @@ def setup():
         console.print("✅ GitHub configured")
     
     console.print("\n🎉 Setup complete! You can now use '2do start' to begin.")
+
+@cli.command()
+@click.option('--project', '-p', help='Project directory to verify (default: current directory)')
+def verify(project):
+    """Verify 2DO setup and guide through missing components"""
+    console.print(Panel.fit("🔍 2DO Setup Verification", style="bold cyan"))
+    
+    project_dir = project if project else os.getcwd()
+    
+    # Run comprehensive setup verification
+    guide = SetupGuide(console)
+    setup_status = guide.run_complete_setup_check(project_dir)
+    
+    # Return appropriate exit code
+    if setup_status.get("is_fully_configured", False):
+        console.print("\n✅ Verification complete: 2DO is ready to use!")
+        return True
+    else:
+        console.print("\n⚠️ Verification complete: Some components need configuration")
+        return False
 
 @cli.command()
 @click.option('--repo', '-r', help='GitHub repository or local path to analyze')
