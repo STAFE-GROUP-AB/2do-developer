@@ -10,6 +10,13 @@ import openai
 import anthropic
 from rich.console import Console
 
+# Conditional import for Google Generative AI
+try:
+    import google.generativeai as genai
+    GOOGLE_AI_AVAILABLE = True
+except ImportError:
+    GOOGLE_AI_AVAILABLE = False
+
 console = Console()
 
 @dataclass
@@ -37,6 +44,22 @@ class AIRouter:
         # OpenAI models
         if self.config.get_api_key("openai"):
             models.update({
+                "gpt-4o": ModelCapability(
+                    name="gpt-4o",
+                    provider="openai",
+                    strengths=["reasoning", "complex_tasks", "code_analysis", "multimodal", "general"],
+                    context_length=128000,
+                    cost_per_token=0.005,
+                    speed_rating=8
+                ),
+                "gpt-4o-mini": ModelCapability(
+                    name="gpt-4o-mini",
+                    provider="openai",
+                    strengths=["speed", "general", "simple_tasks", "cost_effective"],
+                    context_length=128000,
+                    cost_per_token=0.0002,
+                    speed_rating=9
+                ),
                 "gpt-4": ModelCapability(
                     name="gpt-4",
                     provider="openai",
@@ -66,6 +89,30 @@ class AIRouter:
         # Anthropic models
         if self.config.get_api_key("anthropic"):
             models.update({
+                "claude-opus-4-20250514": ModelCapability(
+                    name="claude-opus-4-20250514",
+                    provider="anthropic",
+                    strengths=["reasoning", "creative", "complex_analysis", "research", "writing"],
+                    context_length=200000,
+                    cost_per_token=0.015,
+                    speed_rating=6
+                ),
+                "claude-sonnet-4-20250514": ModelCapability(
+                    name="claude-sonnet-4-20250514",
+                    provider="anthropic",
+                    strengths=["reasoning", "code", "balanced", "general", "analysis"],
+                    context_length=200000,
+                    cost_per_token=0.003,
+                    speed_rating=8
+                ),
+                "claude-3-7-sonnet-20250219": ModelCapability(
+                    name="claude-3-7-sonnet-20250219",
+                    provider="anthropic",
+                    strengths=["reasoning", "code", "balanced", "general"],
+                    context_length=200000,
+                    cost_per_token=0.003,
+                    speed_rating=8
+                ),
                 "claude-3-5-sonnet-20241022": ModelCapability(
                     name="claude-3-5-sonnet-20241022",
                     provider="anthropic",
@@ -92,6 +139,35 @@ class AIRouter:
                 )
             })
         
+        # Google Gemini models
+        if GOOGLE_AI_AVAILABLE and self.config.get_api_key("google"):
+            models.update({
+                "gemini-1.5-pro": ModelCapability(
+                    name="gemini-1.5-pro",
+                    provider="google",
+                    strengths=["reasoning", "complex_tasks", "multimodal", "large_context", "analysis"],
+                    context_length=2000000,  # 2M tokens
+                    cost_per_token=0.0035,
+                    speed_rating=7
+                ),
+                "gemini-1.5-flash": ModelCapability(
+                    name="gemini-1.5-flash",
+                    provider="google",
+                    strengths=["speed", "general", "multimodal", "balanced"],
+                    context_length=1000000,  # 1M tokens
+                    cost_per_token=0.00015,
+                    speed_rating=9
+                ),
+                "gemini-1.0-pro": ModelCapability(
+                    name="gemini-1.0-pro",
+                    provider="google",
+                    strengths=["general", "reasoning", "balanced"],
+                    context_length=32000,
+                    cost_per_token=0.0005,
+                    speed_rating=8
+                )
+            })
+        
         return models
     
     def _setup_clients(self):
@@ -107,6 +183,10 @@ class AIRouter:
             self.clients["anthropic"] = anthropic.Anthropic(
                 api_key=self.config.get_api_key("anthropic")
             )
+        
+        if GOOGLE_AI_AVAILABLE and self.config.get_api_key("google"):
+            genai.configure(api_key=self.config.get_api_key("google"))
+            self.clients["google"] = genai
     
     def analyze_prompt(self, prompt: str) -> Dict[str, float]:
         """Analyze prompt to determine task type and requirements"""
@@ -224,6 +304,8 @@ class AIRouter:
             return self._process_openai(model_name, prompt)
         elif model.provider == "anthropic":
             return self._process_anthropic(model_name, prompt)
+        elif model.provider == "google":
+            return self._process_google(model_name, prompt)
         else:
             raise ValueError(f"Unsupported provider: {model.provider}")
     
@@ -272,3 +354,29 @@ class AIRouter:
                 raise ValueError(f"Rate limit exceeded for Anthropic API")
             else:
                 raise ValueError(f"Anthropic API error: {error_msg}")
+    
+    def _process_google(self, model_name: str, prompt: str) -> str:
+        """Process prompt using Google Gemini model"""
+        if not GOOGLE_AI_AVAILABLE:
+            raise ValueError("Google Generative AI library not available. Please install google-generativeai.")
+        
+        try:
+            client = self.clients["google"]
+            model = client.GenerativeModel(model_name)
+            
+            response = model.generate_content(prompt)
+            
+            if response.text:
+                return response.text
+            else:
+                raise ValueError(f"No response text from Google model '{model_name}'")
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "not found" in error_msg.lower():
+                raise ValueError(f"Model '{model_name}' not found or unavailable in Google AI API")
+            elif "401" in error_msg or "authentication" in error_msg.lower():
+                raise ValueError(f"Invalid Google AI API key")
+            elif "429" in error_msg or "quota" in error_msg.lower():
+                raise ValueError(f"Rate limit or quota exceeded for Google AI API")
+            else:
+                raise ValueError(f"Google AI API error: {error_msg}")
