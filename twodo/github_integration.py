@@ -285,3 +285,119 @@ class GitHubIntegration:
             console.print(f"❌ Failed to finish issue work: {e}")
         
         return None
+    
+    def create_subtasks_as_issues(self, owner: str, repo_name: str, parent_todo: Dict, sub_tasks: List[Dict]) -> List[Dict]:
+        """Create sub-tasks as GitHub issues linked to a parent issue"""
+        if not self.github:
+            console.print("❌ GitHub connection not available")
+            return []
+        
+        created_issues = []
+        
+        # Extract parent issue number if it's from a GitHub issue
+        parent_issue_number = None
+        if "GitHub Issue #" in parent_todo.get("title", ""):
+            import re
+            match = re.search(r'GitHub Issue #(\d+)', parent_todo["title"])
+            if match:
+                parent_issue_number = int(match.group(1))
+        
+        for sub_task in sub_tasks:
+            try:
+                # Create issue title and body
+                if parent_issue_number:
+                    title = f"Sub-task of #{parent_issue_number}: {sub_task['title']}"
+                    body = f"This is a sub-task of issue #{parent_issue_number}.\n\n"
+                else:
+                    title = f"Sub-task: {sub_task['title']}"
+                    body = f"This is a sub-task of: {parent_todo['title']}\n\n"
+                
+                body += f"**Description:** {sub_task['description']}\n\n"
+                if sub_task.get('content'):
+                    body += f"**Additional Context:** {sub_task['content']}\n\n"
+                
+                body += f"**Priority:** {sub_task['priority']}\n"
+                body += f"**Type:** {sub_task['todo_type']}\n"
+                
+                # Add labels for sub-tasks
+                labels = ["sub-task", f"priority-{sub_task['priority']}", f"type-{sub_task['todo_type']}"]
+                
+                # Create the issue
+                issue_info = self.create_issue(owner, repo_name, title, body, labels)
+                
+                if issue_info:
+                    created_issues.append({
+                        'todo_id': sub_task['id'],
+                        'issue_number': issue_info['number'],
+                        'issue_url': issue_info['url'],
+                        'title': issue_info['title']
+                    })
+                    console.print(f"✅ Created issue #{issue_info['number']}: {sub_task['title']}")
+                
+            except Exception as e:
+                console.print(f"❌ Failed to create issue for sub-task {sub_task['title']}: {e}")
+        
+        return created_issues
+    
+    def export_todo_with_subtasks_to_github(self, owner: str, repo_name: str, todo: Dict, todo_manager) -> Dict:
+        """Export a todo and its sub-tasks as GitHub issues"""
+        results = {
+            'parent_issue': None,
+            'sub_issues': [],
+            'success': False
+        }
+        
+        try:
+            # First create the parent issue
+            parent_title = todo['title']
+            parent_body = f"**Description:** {todo['description']}\n\n"
+            
+            if todo.get('content'):
+                parent_body += f"**Additional Context:** {todo['content']}\n\n"
+            
+            parent_body += f"**Priority:** {todo['priority']}\n"
+            parent_body += f"**Type:** {todo['todo_type']}\n"
+            
+            # Check if this todo has sub-tasks
+            sub_tasks = todo_manager.get_sub_tasks(todo['id'])
+            if sub_tasks:
+                parent_body += f"\n**Sub-tasks ({len(sub_tasks)} items):**\n"
+                for i, sub_task in enumerate(sub_tasks, 1):
+                    parent_body += f"{i}. {sub_task['title']}\n"
+                parent_body += "\n*Note: Sub-tasks will be created as separate linked issues.*"
+            
+            # Create parent issue
+            parent_labels = [f"priority-{todo['priority']}", f"type-{todo['todo_type']}"]
+            if sub_tasks:
+                parent_labels.append("has-subtasks")
+            
+            parent_issue = self.create_issue(owner, repo_name, parent_title, parent_body, parent_labels)
+            
+            if parent_issue:
+                results['parent_issue'] = parent_issue
+                console.print(f"✅ Created parent issue #{parent_issue['number']}: {parent_title}")
+                
+                # Create sub-task issues if any exist
+                if sub_tasks:
+                    # Update the parent todo title to include GitHub issue reference
+                    updated_parent_todo = todo.copy()
+                    updated_parent_todo['title'] = f"GitHub Issue #{parent_issue['number']}: {todo['title']}"
+                    
+                    sub_issues = self.create_subtasks_as_issues(owner, repo_name, updated_parent_todo, sub_tasks)
+                    results['sub_issues'] = sub_issues
+                    
+                    if sub_issues:
+                        # Update parent issue with links to sub-issues
+                        parent_body += f"\n\n**Created Sub-task Issues:**\n"
+                        for sub_issue in sub_issues:
+                            parent_body += f"- #{sub_issue['issue_number']}: {sub_issue['title']}\n"
+                        
+                        # Note: We could update the parent issue here if needed
+                        console.print(f"✅ Created {len(sub_issues)} sub-task issues")
+                
+                results['success'] = True
+                
+        except Exception as e:
+            console.print(f"❌ Failed to export todo with sub-tasks: {e}")
+        
+        return results
