@@ -67,10 +67,35 @@
 
 ## Installation
 
+### 🚀 Quick Install (Recommended)
+
+Install 2DO with a single command:
+
+#### Unix/Linux/macOS:
+```bash
+curl -fsSL https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.sh | bash
+```
+
+#### Windows (PowerShell):
+```powershell
+iwr -useb https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.ps1 | iex
+```
+
+The installer will:
+- ✅ Detect your operating system
+- ✅ Check for Python 3.8+ (install if needed)
+- ✅ Download and install 2DO
+- ✅ Set up the command in your PATH
+- ✅ Run the setup wizard automatically
+
+### 📦 Manual Installation
+
+If you prefer to install manually:
+
 ```bash
 # Clone the repository
-git clone https://github.com/STAFE-GROUP-AB/AI-Redirector.git
-cd AI-Redirector
+git clone https://github.com/STAFE-GROUP-AB/2do-developer.git
+cd 2do-developer
 
 # Install dependencies
 pip install -r requirements.txt
