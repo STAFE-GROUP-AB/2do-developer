@@ -236,11 +236,23 @@ EOF
 # Run setup wizard
 run_setup() {
     print_status "Running 2DO setup wizard..."
+    
+    # Change to a stable directory before running setup
+    cd "$HOME"
+    
     if command_exists "$INSTALL_DIR/2do"; then
-        "$INSTALL_DIR/2do" setup
+        # Try interactive setup first, with fallback to non-interactive
+        if ! "$INSTALL_DIR/2do" setup 2>/dev/null; then
+            print_warning "Interactive setup failed, showing manual instructions..."
+            "$INSTALL_DIR/2do" setup --non-interactive
+        fi
     else
         source "$VENV_DIR/bin/activate"
-        2do setup
+        # Try interactive setup first, with fallback to non-interactive
+        if ! 2do setup 2>/dev/null; then
+            print_warning "Interactive setup failed, showing manual instructions..."
+            2do setup --non-interactive
+        fi
     fi
 }
 
@@ -291,12 +303,7 @@ main() {
     
     # Run setup wizard
     echo ""
-    print_status "Starting setup wizard..."
-    if command_exists "$INSTALL_DIR/2do" && [[ ":$PATH:" == *":$INSTALL_DIR:"* ]]; then
-        "$INSTALL_DIR/2do" setup
-    else
-        print_status "Please restart your terminal and run: 2do setup"
-    fi
+    run_setup
     
     echo ""
     print_success "2DO is now installed! 🎉"

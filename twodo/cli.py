@@ -29,6 +29,64 @@ from .setup_guide import SetupGuide
 
 console = Console()
 
+def _is_terminal_interactive():
+    """Check if we're in an interactive terminal"""
+    import sys
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+def _safe_confirm(message, default=False):
+    """Safely ask for confirmation with fallback"""
+    try:
+        return Confirm.ask(message, default=default)
+    except (KeyboardInterrupt, EOFError):
+        raise
+    except Exception:
+        # If prompt fails, return default
+        console.print(f"⚠️ Could not get input for: {message}")
+        return default
+
+def _safe_prompt(message, password=False, default=""):
+    """Safely prompt for input with fallback"""
+    try:
+        result = Prompt.ask(message, password=password, default=default)
+        return result.strip() if result else ""
+    except (KeyboardInterrupt, EOFError):
+        raise
+    except Exception:
+        # If prompt fails, return default
+        console.print(f"⚠️ Could not get input for: {message}")
+        return default
+
+def _get_safe_working_directory():
+    """Get current working directory with fallback"""
+    try:
+        return os.getcwd()
+    except (OSError, FileNotFoundError):
+        # If we can't get current directory, fall back to home directory
+        return str(Path.home())
+
+def _show_manual_setup_instructions(config_manager):
+    """Show manual setup instructions"""
+    console.print(Panel(
+        f"📖 Manual Setup Instructions:\n\n"
+        f"2DO configuration file location:\n"
+        f"  {config_manager.config_file}\n\n"
+        f"You can manually edit this file with your API keys:\n\n"
+        f"```yaml\n"
+        f"api_keys:\n"
+        f"  openai: 'your-openai-api-key-here'\n"
+        f"  anthropic: 'your-anthropic-api-key-here'\n"
+        f"  github: 'your-github-token-here'\n"
+        f"preferences:\n"
+        f"  default_model: auto\n"
+        f"  max_parallel_tasks: 5\n"
+        f"  memory_enabled: true\n"
+        f"```\n\n"
+        f"Or run '2do setup' again from a stable directory.",
+        title="Manual Configuration",
+        style="cyan"
+    ))
+
 @click.group()
 @click.version_option(package_name="2do")
 def cli():
@@ -36,34 +94,57 @@ def cli():
     pass
 
 @cli.command()
-def setup():
+@click.option('--non-interactive', is_flag=True, help='Skip interactive prompts and show manual setup instructions')
+def setup(non_interactive):
     """Initial setup - configure AI model API keys"""
     console.print(Panel.fit("🚀 Welcome to 2DO Setup", style="bold blue"))
     
-    config_manager = ConfigManager()
+    try:
+        config_manager = ConfigManager()
+    except Exception as e:
+        console.print(f"❌ Error initializing configuration: {e}")
+        console.print("💡 Try running this command from your home directory or a stable directory")
+        return
+    
+    # Handle non-interactive mode or terminal issues
+    if non_interactive or not _is_terminal_interactive():
+        _show_manual_setup_instructions(config_manager)
+        return
     
     # Get AI model preferences
     console.print("\n📋 Let's configure your AI models:")
     
-    # OpenAI
-    if Confirm.ask("Do you want to use OpenAI models?"):
-        api_key = Prompt.ask("Enter your OpenAI API key", password=True)
-        config_manager.set_api_key("openai", api_key)
-        console.print("✅ OpenAI configured")
-    
-    # Anthropic
-    if Confirm.ask("Do you want to use Anthropic Claude models?"):
-        api_key = Prompt.ask("Enter your Anthropic API key", password=True)
-        config_manager.set_api_key("anthropic", api_key)
-        console.print("✅ Anthropic configured")
-    
-    # GitHub
-    if Confirm.ask("Do you want to configure GitHub integration?"):
-        github_token = Prompt.ask("Enter your GitHub personal access token", password=True)
-        config_manager.set_api_key("github", github_token)
-        console.print("✅ GitHub configured")
-    
-    console.print("\n🎉 Setup complete! You can now use '2do start' to begin.")
+    try:
+        # OpenAI
+        if _safe_confirm("Do you want to use OpenAI models?"):
+            api_key = _safe_prompt("Enter your OpenAI API key", password=True)
+            if api_key:
+                config_manager.set_api_key("openai", api_key)
+                console.print("✅ OpenAI configured")
+        
+        # Anthropic
+        if _safe_confirm("Do you want to use Anthropic Claude models?"):
+            api_key = _safe_prompt("Enter your Anthropic API key", password=True)
+            if api_key:
+                config_manager.set_api_key("anthropic", api_key)
+                console.print("✅ Anthropic configured")
+        
+        # GitHub
+        if _safe_confirm("Do you want to configure GitHub integration?"):
+            github_token = _safe_prompt("Enter your GitHub personal access token", password=True)
+            if github_token:
+                config_manager.set_api_key("github", github_token)
+                console.print("✅ GitHub configured")
+        
+        console.print("\n🎉 Setup complete! You can now use '2do start' to begin.")
+        
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n⚠️ Setup interrupted by user")
+        _show_manual_setup_instructions(config_manager)
+    except Exception as e:
+        console.print(f"\n❌ Setup failed: {e}")
+        console.print("💡 You can configure 2DO manually by editing the config file")
+        _show_manual_setup_instructions(config_manager)
 
 @cli.command()
 @click.option('--project', '-p', help='Project directory to verify (default: current directory)')
@@ -91,11 +172,22 @@ def start(repo):
     """Start the 2DO interactive session"""
     console.print(Panel.fit("🤖 2DO Starting...", style="bold green"))
     
-    # Determine the working directory
-    working_dir = repo if repo else os.getcwd()
+    # Determine the working directory with error handling
+    working_dir = repo if repo else _get_safe_working_directory()
     
     # Check if we're in a git repository
-    config_manager = ConfigManager(working_dir)
+    try:
+        config_manager = ConfigManager(working_dir)
+    except Exception as e:
+        console.print(f"❌ Error initializing configuration: {e}")
+        console.print("💡 Falling back to global configuration")
+        try:
+            config_manager = ConfigManager()
+        except Exception as e2:
+            console.print(f"❌ Critical error: {e2}")
+            console.print("💡 Please run '2do setup' from your home directory")
+            return
+    
     if config_manager.is_local_project:
         console.print(f"📁 Using local 2DO folder in git repository: {working_dir}")
     else:

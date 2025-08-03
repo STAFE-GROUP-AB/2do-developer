@@ -1,0 +1,6 @@
+api_keys: {}
+mcp_servers: []
+preferences:
+  default_model: auto
+  max_parallel_tasks: 5
+  memory_enabled: true
