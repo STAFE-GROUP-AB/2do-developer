@@ -129,6 +129,13 @@ def setup(non_interactive):
                 config_manager.set_api_key("anthropic", api_key)
                 console.print("✅ Anthropic configured")
         
+        # Google AI (optional)
+        if _safe_confirm("Do you want to use Google Gemini models? (optional)"):
+            api_key = _safe_prompt("Enter your Google AI API key", password=True)
+            if api_key:
+                config_manager.set_api_key("google", api_key)
+                console.print("✅ Google AI configured")
+        
         # GitHub
         if _safe_confirm("Do you want to configure GitHub integration?"):
             github_token = _safe_prompt("Enter your GitHub personal access token", password=True)

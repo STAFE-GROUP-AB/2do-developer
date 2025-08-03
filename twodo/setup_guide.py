@@ -61,13 +61,14 @@ class SetupGuide:
             "is_local_project": self.config.is_local_project,
             "openai_configured": bool(self.config.get_api_key("openai")),
             "anthropic_configured": bool(self.config.get_api_key("anthropic")),
+            "google_configured": bool(self.config.get_api_key("google")),
             "github_configured": bool(self.config.get_api_key("github")),
             "has_any_api_keys": self.config.has_api_keys(),
             "memory_enabled": self.config.get_preference("memory_enabled", True),
             "max_parallel_tasks": self.config.get_preference("max_parallel_tasks", 5)
         }
         
-        # Calculate completion
+        # Calculate completion - Google is optional, not required
         required_components = ["openai_configured", "anthropic_configured", "github_configured"]
         configured_count = sum(1 for comp in required_components if status[comp])
         status["configuration_percentage"] = (configured_count / len(required_components)) * 100
@@ -95,6 +96,9 @@ class SetupGuide:
         
         anthropic_status = "✅ Configured" if status["anthropic_configured"] else "❌ Not configured"
         table.add_row("Anthropic API Key", anthropic_status, "Required for Claude models")
+        
+        google_status = "✅ Configured" if status["google_configured"] else "⚠️ Optional"
+        table.add_row("Google AI API Key", google_status, "Optional for Gemini models")
         
         github_status = "✅ Configured" if status["github_configured"] else "❌ Not configured"
         table.add_row("GitHub Token", github_status, "Required for GitHub integration")
@@ -133,15 +137,23 @@ class SetupGuide:
         if not status["github_configured"]:
             missing_components.append(("GitHub Token", self.configure_github))
         
-        self.console.print(f"\n📝 Found {len(missing_components)} components to configure:")
+        self.console.print(f"\n📝 Found {len(missing_components)} required components to configure:")
         
         for i, (component_name, _) in enumerate(missing_components, 1):
             self.console.print(f"   {i}. {component_name}")
+        
+        # Offer optional Google configuration
+        if not status["google_configured"]:
+            self.console.print(f"\n🔧 Optional: Google AI API Key (for Gemini models)")
         
         if Confirm.ask("\n🚀 Would you like to configure these now?"):
             for component_name, configure_func in missing_components:
                 self.console.print(f"\n🔧 Configuring {component_name}...")
                 configure_func()
+            
+            # Optionally configure Google
+            if not status["google_configured"] and Confirm.ask("\n🤖 Would you like to configure Google AI (optional)?"):
+                self.configure_google()
         else:
             self.console.print("\n💡 You can run '2do setup' anytime to configure these components.")
             self.display_manual_setup_instructions(missing_components)
@@ -186,6 +198,27 @@ class SetupGuide:
                 self.console.print("✅ Anthropic API key configured!")
             else:
                 self.console.print("⚠️ No API key entered. Skipping Anthropic configuration.")
+    
+    def configure_google(self):
+        """Guide Google AI API key configuration"""
+        self.console.print(Panel(
+            "To use Google Gemini models, you need an API key:\n\n"
+            "1. Visit: https://aistudio.google.com/app/apikey\n"
+            "2. Sign in with your Google account\n"
+            "3. Click 'Create API key'\n"
+            "4. Copy the generated API key\n\n"
+            "Note: Google AI Studio may have usage limits.",
+            title="🔮 Google AI Setup",
+            style="cyan"
+        ))
+        
+        if Confirm.ask("Do you want to configure Google AI now?"):
+            api_key = Prompt.ask("Enter your Google AI API key", password=True)
+            if api_key and api_key.strip():
+                self.config.set_api_key("google", api_key.strip())
+                self.console.print("✅ Google AI API key configured!")
+            else:
+                self.console.print("⚠️ No API key entered. Skipping Google AI configuration.")
     
     def configure_github(self):
         """Guide GitHub token configuration"""
