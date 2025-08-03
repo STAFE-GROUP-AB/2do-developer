@@ -45,6 +45,14 @@ class Multitasker:
         """Create an appropriate prompt based on todo type and content"""
         base_prompt = f"Task: {todo['title']}\nDescription: {todo['description']}\n"
         
+        # Add context for sub-tasks
+        if todo.get("parent_id"):
+            base_prompt += "NOTE: This is a sub-task that is part of a larger project.\n"
+            base_prompt += "Focus on this specific component while keeping the broader context in mind.\n"
+        elif todo.get("sub_task_ids") and len(todo.get("sub_task_ids", [])) > 0:
+            base_prompt += f"NOTE: This is a parent task with {len(todo['sub_task_ids'])} sub-tasks.\n"
+            base_prompt += "Provide a high-level approach that can guide the individual sub-tasks.\n"
+        
         if todo["todo_type"] == "code":
             base_prompt += "This is a coding task. Please provide a complete solution with code examples and explanations.\n"
         elif todo["todo_type"] == "text":
@@ -56,23 +64,59 @@ class Multitasker:
             base_prompt += f"\nAdditional context:\n{todo['content']}\n"
         
         base_prompt += f"\nPriority: {todo['priority']}\n"
-        base_prompt += "Please provide a detailed and actionable response."
+        
+        # Adjust prompt based on priority and task type
+        if todo.get("parent_id"):
+            base_prompt += "Please provide a focused solution for this specific sub-task."
+        else:
+            base_prompt += "Please provide a detailed and actionable response."
         
         return base_prompt
     
     def start_multitask(self, todos: List[Dict]):
-        """Start multitasking processing of todos"""
+        """Start multitasking processing of todos with sub-task awareness"""
         if not todos:
             console.print("No todos to process")
             return
         
+        # Analyze todos for sub-task relationships
+        parent_todos = [todo for todo in todos if not todo.get("parent_id")]
+        sub_todos = [todo for todo in todos if todo.get("parent_id")]
+        
         console.print(f"🚀 Starting multitask processing for {len(todos)} todos...")
+        console.print(f"   📁 {len(parent_todos)} parent todos")
+        console.print(f"   📎 {len(sub_todos)} sub-tasks")
+        
+        # Offer processing options
+        if sub_todos and parent_todos:
+            from rich.prompt import Prompt, Confirm
+            
+            if Confirm.ask("Process parent todos and sub-tasks hierarchically (parents first)?"):
+                self._process_hierarchical(parent_todos, sub_todos)
+                return
         
         # Run async processing
         results = asyncio.run(self._process_todos_parallel(todos))
         
         # Display results
         self._display_results(results)
+    
+    def _process_hierarchical(self, parent_todos: List[Dict], sub_todos: List[Dict]):
+        """Process parent todos first, then their sub-tasks"""
+        console.print("📋 Processing in hierarchical order...")
+        
+        # Process parent todos first
+        console.print("\n🔹 Phase 1: Processing parent todos...")
+        parent_results = asyncio.run(self._process_todos_parallel(parent_todos))
+        
+        # Process sub-tasks
+        console.print("\n🔹 Phase 2: Processing sub-tasks...")
+        sub_results = asyncio.run(self._process_todos_parallel(sub_todos))
+        
+        # Combine and display all results
+        all_results = parent_results + sub_results
+        console.print("\n📊 Combined Results:")
+        self._display_results(all_results)
     
     async def _process_todos_parallel(self, todos: List[Dict]) -> List[Dict]:
         """Process todos in parallel with progress tracking"""
