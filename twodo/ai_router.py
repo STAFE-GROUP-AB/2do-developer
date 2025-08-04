@@ -240,8 +240,8 @@ class AIRouter:
         
         return analysis
     
-    def select_best_model(self, prompt: str) -> str:
-        """Select the best model for a given prompt"""
+    def select_best_model(self, prompt: str, todo_context: str = None) -> str:
+        """Select the best model for a given prompt with optional todo context"""
         if not self.models:
             raise ValueError("No AI models configured. Please run setup first.")
         
@@ -272,14 +272,19 @@ class AIRouter:
         
         # Return the model with the highest score
         best_model = max(scores.items(), key=lambda x: x[1])[0]
-        console.print(f"🎯 Selected model: {best_model} (score: {scores[best_model]:.2f})")
+        
+        # Show model selection with context
+        if todo_context:
+            console.print(f"🎯 Selected [bold yellow]{best_model}[/bold yellow] for: [italic]{todo_context}[/italic] (score: {scores[best_model]:.2f})")
+        else:
+            console.print(f"🎯 Selected model: {best_model} (score: {scores[best_model]:.2f})")
         return best_model
     
     def set_developer_context(self, context: str):
         """Set the developer context for all AI interactions"""
         self.developer_context = context
     
-    def route_and_process(self, prompt: str) -> str:
+    def route_and_process(self, prompt: str, todo_context: str = None) -> str:
         """Route prompt to best model and process it"""
         # Enhance prompt with developer context if available
         enhanced_prompt = prompt
@@ -288,7 +293,7 @@ class AIRouter:
         
         # Try the best model first
         try:
-            model_name = self.select_best_model(enhanced_prompt)
+            model_name = self.select_best_model(enhanced_prompt, todo_context)
             self.last_selected_model = model_name
             return self._process_with_model(model_name, enhanced_prompt)
         except Exception as e:

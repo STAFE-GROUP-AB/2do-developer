@@ -18,7 +18,7 @@ class Multitasker:
         self.todo_manager = todo_manager
         self.max_workers = 5  # Maximum concurrent tasks
     
-    async def process_todo_async(self, todo: Dict) -> Dict:
+    async def process_todo_async(self, todo: Dict, progress_callback=None) -> Dict:
         """Process a single todo asynchronously"""
         todo_id = todo["id"]
         try:
@@ -28,11 +28,18 @@ class Multitasker:
             else:
                 todo["status"] = "in_progress"
             
+            # Show what we're working on
+            todo_title = todo['title'][:50] + "..." if len(todo['title']) > 50 else todo['title']
+            console.print(f"🔨 Starting work on: [bold cyan]{todo_title}[/bold cyan]")
+            
             # Create prompt based on todo type and content
             prompt = self._create_prompt_for_todo(todo)
             
+            # Show routing stage
+            console.print(f"🤔 Analyzing task requirements for optimal AI model...")
+            
             # Route to best AI model and process
-            result = self.ai_router.route_and_process(prompt)
+            result = self.ai_router.route_and_process(prompt, todo_context=todo_title)
             
             # Update todo with result and persist to file
             if self.todo_manager:
@@ -41,15 +48,24 @@ class Multitasker:
                 self.todo_manager.update_todo_status(todo_id, "completed", result, assigned_model)
                 # Return updated todo from manager to ensure consistency
                 updated_todo = self.todo_manager.get_todo_by_id(todo_id)
+                
+                # Show completion with enhanced display from PR #46
+                console.print(f"✅ Completed: [bold green]{todo_title}[/bold green]")
+                
                 return updated_todo if updated_todo else todo
             else:
                 todo["status"] = "completed"
                 todo["result"] = result
+                
+                # Show completion
+                console.print(f"✅ Completed: [bold green]{todo_title}[/bold green]")
+                
                 return todo
             
         except Exception as e:
             error_msg = f"Error: {str(e)}"
-            console.print(f"❌ Error processing todo {todo_id}: {error_msg}")
+            todo_title = todo['title'][:50] + "..." if len(todo['title']) > 50 else todo['title']
+            console.print(f"❌ Error processing [bold red]{todo_title}[/bold red]: {error_msg}")
             
             # Update status to failed and persist to file
             if self.todo_manager:
@@ -148,16 +164,32 @@ class Multitasker:
     async def _process_todos_parallel(self, todos: List[Dict]) -> List[Dict]:
         """Process todos in parallel with progress tracking"""
         
+        # Show overview of what will be processed
+        console.print(f"\n📋 About to process {len(todos)} todos:")
+        for i, todo in enumerate(todos[:5], 1):  # Show first 5
+            todo_preview = todo['title'][:40] + "..." if len(todo['title']) > 40 else todo['title']
+            console.print(f"   {i}. [cyan]{todo_preview}[/cyan] ({todo['priority']} priority)")
+        if len(todos) > 5:
+            console.print(f"   ... and {len(todos) - 5} more todos")
+        console.print("")
+        
         with Progress() as progress:
-            task = progress.add_task("[cyan]Processing todos...", total=len(todos))
+            task = progress.add_task(f"[cyan]Processing {len(todos)} todos...", total=len(todos))
+            completed_count = 0
             
             # Create semaphore to limit concurrent tasks
             semaphore = asyncio.Semaphore(self.max_workers)
             
             async def process_with_semaphore(todo):
+                nonlocal completed_count
                 async with semaphore:
                     result = await self.process_todo_async(todo)
-                    progress.advance(task)
+                    completed_count += 1
+                    
+                    # Update progress with current status
+                    progress.update(task, 
+                                  advance=1, 
+                                  description=f"[cyan]Processed {completed_count}/{len(todos)} todos...")
                     return result
             
             # Create tasks for all todos
