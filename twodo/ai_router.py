@@ -482,7 +482,7 @@ REMEMBER: You have real file system access - USE IT!
         
         return f"{file_operation_context}\n\nUser Request: {prompt}"
     
-    def route_and_process(self, prompt: str, todo_context: str = None) -> str:
+    async def route_and_process(self, prompt: str, todo_context: str = None) -> str:
         """Route prompt to best model and process it"""
         # Enhance prompt with developer context if available
         enhanced_prompt = prompt
@@ -493,7 +493,7 @@ REMEMBER: You have real file system access - USE IT!
         try:
             model_name = self.select_best_model(enhanced_prompt, todo_context)
             self.last_selected_model = model_name
-            return self._process_with_model(model_name, enhanced_prompt)
+            return await self._process_with_model(model_name, enhanced_prompt)
         except Exception as e:
             console.print(f"❌ Primary model failed: {str(e)}")
             
@@ -503,7 +503,7 @@ REMEMBER: You have real file system access - USE IT!
                 try:
                     console.print(f"🔄 Trying fallback model: {fallback_model}")
                     self.last_selected_model = fallback_model
-                    return self._process_with_model(fallback_model, enhanced_prompt)
+                    return await self._process_with_model(fallback_model, enhanced_prompt)
                 except Exception as fallback_error:
                     console.print(f"❌ Fallback model {fallback_model} failed: {str(fallback_error)}")
                     continue
@@ -513,12 +513,12 @@ REMEMBER: You have real file system access - USE IT!
             self.last_selected_model = "failed"
             return f"Error: All AI models are currently unavailable. Please check your API keys and try again."
     
-    def _process_with_model(self, model_name: str, prompt: str) -> str:
+    async def _process_with_model(self, model_name: str, prompt: str) -> str:
         """Process prompt with a specific model"""
         model = self.models[model_name]
         
         if model.provider == "openai":
-            return self._process_openai(model_name, prompt)
+            return await self._process_openai(model_name, prompt)
         elif model.provider == "anthropic":
             return self._process_anthropic(model_name, prompt)
         elif model.provider == "google":
@@ -577,7 +577,7 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
 
 **Note:** {info['note']}"""
     
-    def _process_openai(self, model_name: str, prompt: str) -> str:
+    async def _process_openai(self, model_name: str, prompt: str) -> str:
         """Process prompt using OpenAI model with filesystem tools"""
         try:
             client = self.clients["openai"]
@@ -605,8 +605,8 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
                     temperature=0.7
                 )
                 
-                # Handle tool calls
-                return asyncio.run(self._handle_openai_tool_calls(response, messages, client, model_name))
+                # Handle tool calls - CRITICAL FIX: Use await instead of asyncio.run()
+                return await self._handle_openai_tool_calls(response, messages, client, model_name)
             else:
                 response = client.chat.completions.create(
                     model=model_name,

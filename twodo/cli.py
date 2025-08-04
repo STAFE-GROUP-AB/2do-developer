@@ -747,7 +747,8 @@ def handle_multitask(multitasker, todo_manager, browser_integration):
     console.print(f"🚀 Starting multitask processing for {len(todos)} todos...")
     
     if Confirm.ask("Proceed with multitasking?"):
-        multitasker.start_multitask(todos)
+        # CRITICAL FIX: Use asyncio.run for async method call
+        asyncio.run(multitasker.start_multitask(todos))
         console.print("✅ Multitasking completed!")
         
         # Auto-refresh browser if active
@@ -1712,6 +1713,11 @@ def github_pro():
         github_integration = GitHubIntegration(config_manager.get_api_key("github"))
         todo_manager = TodoManager(config_manager.config_dir)
         ai_router = AIRouter(config_manager)
+        
+        # CRITICAL FIX: Initialize filesystem server with correct project path
+        console.print(f"🎯 Initializing filesystem for directory: {working_dir}")
+        asyncio.run(ai_router.initialize_filesystem(working_dir))
+        
         multitasker = Multitasker(ai_router, todo_manager)
         
         # Initialize automation engine
@@ -1749,6 +1755,11 @@ def run_all():
         github_integration = GitHubIntegration(config_manager.get_api_key("github"))
         todo_manager = TodoManager(config_manager.config_dir)
         ai_router = AIRouter(config_manager)
+        
+        # CRITICAL FIX: Initialize filesystem server with correct project path
+        console.print(f"🎯 Initializing filesystem for directory: {working_dir}")
+        asyncio.run(ai_router.initialize_filesystem(working_dir))
+        
         multitasker = Multitasker(ai_router, todo_manager)
         
         # Initialize automation engine
@@ -1786,6 +1797,11 @@ def smart_todo(request):
         github_integration = GitHubIntegration(config_manager.get_api_key("github"))
         todo_manager = TodoManager(config_manager.config_dir)
         ai_router = AIRouter(config_manager)
+        
+        # CRITICAL FIX: Initialize filesystem server with correct project path
+        console.print(f"🎯 Initializing filesystem for directory: {working_dir}")
+        asyncio.run(ai_router.initialize_filesystem(working_dir))
+        
         multitasker = Multitasker(ai_router, todo_manager)
         
         # Initialize automation engine

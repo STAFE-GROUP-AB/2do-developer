@@ -39,7 +39,7 @@ class Multitasker:
             console.print(f"🤔 Analyzing task requirements for optimal AI model...")
             
             # Route to best AI model and process
-            result = self.ai_router.route_and_process(prompt, todo_context=todo_title)
+            result = await self.ai_router.route_and_process(prompt, todo_context=todo_title)
             
             # Update todo with result and persist to file
             if self.todo_manager:
@@ -234,7 +234,8 @@ class Multitasker:
             return
         
         console.print(f"🎯 Processing {len(filtered_todos)} todos of type '{todo_type}'...")
-        self.start_multitask(filtered_todos)
+        # CRITICAL FIX: Use asyncio.run for async method call
+        asyncio.run(self.start_multitask(filtered_todos))
     
     def process_batch_by_priority(self, todos: List[Dict], priority: str):
         """Process a batch of todos of a specific priority"""
@@ -245,4 +246,5 @@ class Multitasker:
             return
         
         console.print(f"🚨 Processing {len(filtered_todos)} todos with priority '{priority}'...")
-        self.start_multitask(filtered_todos)
+        # CRITICAL FIX: Use asyncio.run for async method call
+        asyncio.run(self.start_multitask(filtered_todos))

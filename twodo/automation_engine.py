@@ -217,22 +217,21 @@ class AutomationEngine:
         
         try:
             # Start multitasking on all pending todos
-            success = await self.multitasker.start_multitasking()
-            if success:
-                console.print("🎉 ALL TODOS LAUNCHED! The automation army is working!")
-                return True
-            else:
-                console.print("❌ Some todos failed to start - but we tried our best!")
-                return False
+            await self.multitasker.start_multitask(pending_todos)
+            console.print("🎉 ALL TODOS LAUNCHED! The automation army is working!")
+            return True
         except Exception as e:
             console.print(f"💥 Run all encountered an error: {e}")
             return False
     
     async def _start_single_todo_multitask(self, todo_id: str):
         """Start multitasking on a single specific todo"""
-        # This would need integration with the multitasker to handle single todos
-        # For now, we'll start general multitasking
-        await self.multitasker.start_multitasking()
+        # Get the specific todo by ID
+        todo = self.todo_manager.get_todo_by_id(todo_id)
+        if todo:
+            await self.multitasker.start_multitask([todo])
+        else:
+            console.print(f"❌ Todo with ID {todo_id} not found")
     
     def toggle_github_pro_mode(self) -> bool:
         """Toggle GitHub Pro mode on/off"""
