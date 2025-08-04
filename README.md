@@ -340,7 +340,7 @@ The project includes a comprehensive test suite with 11 test modules covering:
 
 ### 🚀 Quick Install (Recommended)
 
-Install 2DO with a single command:
+Install 2DO with a single command using our comprehensive curl-based installation system:
 
 #### Unix/Linux/macOS:
 ```bash
@@ -352,30 +352,121 @@ curl -fsSL https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/i
 iwr -useb https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.ps1 | iex
 ```
 
-The installer will:
-- ✅ Detect your operating system
-- ✅ Check for Python 3.8+ (install if needed)
-- ✅ Download and install 2DO
-- ✅ Set up the command in your PATH
-- ✅ Run the setup wizard automatically
+### 🔧 What the Installer Does
+
+Our smart installation system provides a comprehensive, automated setup process:
+
+#### **Automatic Detection & Validation**
+- ✅ **Operating System Detection**: Automatically identifies your platform (Windows, macOS, Linux distributions)
+- ✅ **Architecture Detection**: Supports x86_64, ARM64, and other architectures
+- ✅ **Python Version Validation**: Ensures Python 3.8+ is available (provides installation guidance if missing)
+- ✅ **Distribution-Specific Support**: Uses appropriate package managers (apt, dnf/yum, pacman, Homebrew, winget, Chocolatey)
+
+#### **Smart Installation Process**
+- ✅ **Isolated Environment**: Creates a dedicated virtual environment at `~/.2do` for clean installation
+- ✅ **Multiple Download Methods**: Uses git clone with fallbacks to curl and wget for maximum compatibility
+- ✅ **Dependency Management**: Automatically installs all required Python packages with retry logic
+- ✅ **PATH Configuration**: Automatically adds `2do` command to your shell PATH (bash, zsh, PowerShell)
+- ✅ **Setup Wizard Integration**: Runs the interactive setup wizard for API key configuration
+
+#### **Robust Error Handling**
+- ✅ **Network Resilience**: Automatic retries for network timeouts and connectivity issues
+- ✅ **Fallback Methods**: Multiple download strategies if primary method fails
+- ✅ **Clear Error Messages**: Helpful troubleshooting guidance for common installation issues
+- ✅ **Recovery Options**: Provides manual installation instructions if automated setup fails
+- ✅ **Permission Handling**: Intelligent handling of file permissions and directory creation
 
 ### 📦 Manual Installation
 
-If you prefer to install manually:
+If the automated installer doesn't work for your system, you can install manually:
 
+#### Method 1: Git Clone (Recommended for Development)
 ```bash
 # Clone the repository
 git clone https://github.com/STAFE-GROUP-AB/2do-developer.git
 cd 2do-developer
 
-# Install dependencies
-pip install -r requirements.txt
+# Create virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install the package
+# Install dependencies and package
+pip install -r requirements.txt
+pip install -e .
+
+# Verify installation
+2do --help
+```
+
+#### Method 2: Direct pip Install from GitHub
+```bash
+# Install directly from GitHub (latest main branch)
+pip install git+https://github.com/STAFE-GROUP-AB/2do-developer.git
+
+# Or install in user directory
+pip install --user git+https://github.com/STAFE-GROUP-AB/2do-developer.git
+```
+
+#### Method 3: Download and Install Manually
+```bash
+# Download the source code
+curl -L https://github.com/STAFE-GROUP-AB/2do-developer/archive/main.zip -o 2do-main.zip
+unzip 2do-main.zip
+cd 2do-developer-main
+
+# Install
 pip install -e .
 ```
 
+### ✅ Installation Verification
+
+After installation, verify everything is working correctly:
+
+```bash
+# Check if 2do command is available
+2do --version
+
+# Verify Python environment
+python --version  # Should be 3.8+
+
+# Run setup wizard
+2do setup
+
+# Test basic functionality
+2do --help
+```
+
+#### Common Verification Issues
+- **Command not found**: Check if installation path is in your PATH
+- **Module import errors**: Verify all dependencies are installed
+- **Permission errors**: Ensure proper file permissions for config directory
+
+### 🌍 Cross-Platform Installation Support
+
+Our installation system is designed to work seamlessly across different platforms:
+
+#### **Supported Platforms**
+- **Linux**: Ubuntu, Debian, CentOS, RHEL, Fedora, Arch Linux, and other distributions
+- **macOS**: Intel and Apple Silicon (M1/M2) Macs with Homebrew support
+- **Windows**: Windows 10+ with PowerShell, including winget and Chocolatey integration
+
+#### **Package Manager Integration**
+The installer automatically detects and uses your system's package manager:
+- **Linux**: `apt` (Ubuntu/Debian), `dnf`/`yum` (RHEL/CentOS/Fedora), `pacman` (Arch)
+- **macOS**: `brew` (Homebrew)
+- **Windows**: `winget` (Windows Package Manager), `choco` (Chocolatey)
+
+#### **Installation Method Reliability** 
+The curl-based installation has been thoroughly tested and includes:
+- ✅ **Pipe Execution Support**: The `curl | bash` method works reliably across all platforms
+- ✅ **Shell Compatibility**: Works with bash, zsh, fish, and other POSIX-compliant shells
+- ✅ **Network Resilience**: Handles network interruptions and SSL certificate issues
+- ✅ **Fallback Mechanisms**: Multiple download methods if primary approach fails
+
+> **Note**: The installation scripts have been specifically optimized to work with pipe execution (`curl | bash` and `iwr | iex`), ensuring the documented installation commands work reliably on all supported platforms.
+
 ## Updates
+
 
 ### 🔄 Automatic Updates
 
@@ -839,19 +930,102 @@ When contributing, please follow these architectural principles:
 ### Common Issues
 
 #### Installation Problems
-**Issue**: `pip install` fails with permission errors
+
+**Issue**: Curl-based installation fails or "nothing happens"
 ```bash
-# Solution: Use user installation
-pip install --user -e .
+# Solution 1: Verify curl is working
+curl -fsSL https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.sh
+# Should display the script content
+
+# Solution 2: Download and run manually
+wget https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.sh
+chmod +x install.sh
+./install.sh
+
+# Solution 3: Use alternative download method
+curl -L -o install.sh https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.sh
+bash install.sh
 ```
 
-**Issue**: Python version compatibility errors
+**Issue**: Python version compatibility errors during installation
 ```bash
-# Solution: Check Python version and upgrade if needed
-python --version  # Should be 3.8+
-# On Ubuntu/Debian: sudo apt update && sudo apt install python3.10
-# On macOS: brew install python@3.10  
-# On Windows: Download from python.org
+# Check current Python version
+python --version
+python3 --version
+
+# Install Python 3.8+ if needed:
+# Ubuntu/Debian:
+sudo apt update && sudo apt install python3.10 python3.10-venv python3-pip
+
+# CentOS/RHEL/Fedora:
+sudo dnf install python3.10 python3-pip
+
+# macOS (with Homebrew):
+brew install python@3.10
+
+# Arch Linux:
+sudo pacman -S python python-pip
+```
+
+**Issue**: Virtual environment creation fails
+```bash
+# Solution: Install python3-venv package
+# Ubuntu/Debian:
+sudo apt install python3-venv
+
+# Or use alternative virtual environment creation:
+python3 -m pip install --user virtualenv
+python3 -m virtualenv ~/.2do/venv
+```
+
+**Issue**: `pip install` fails with permission errors
+```bash
+# Solution: Use user installation or fix permissions
+pip install --user -e .
+
+# Or create virtual environment manually:
+python3 -m venv ~/.2do/venv
+source ~/.2do/venv/bin/activate  # On Windows: ~/.2do/venv/Scripts/activate
+pip install -e .
+```
+
+**Issue**: Network timeout during installation
+```bash
+# Solution: Increase timeout and retry
+curl -fsSL --max-time 300 --retry 3 https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.sh | bash
+
+# Or use manual installation:
+git clone https://github.com/STAFE-GROUP-AB/2do-developer.git
+cd 2do-developer
+pip install -e .
+```
+
+**Issue**: Windows PowerShell execution policy prevents installation
+```powershell
+# Solution: Temporarily allow script execution
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Run the installer
+iwr -useb https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.ps1 | iex
+
+# Restore original policy (optional)
+Set-ExecutionPolicy -ExecutionPolicy Restricted -Scope CurrentUser
+```
+
+**Issue**: PATH not updated after installation
+```bash
+# Solution: Manually add to PATH or restart shell
+
+# For bash (add to ~/.bashrc):
+echo 'export PATH="$HOME/.2do/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# For zsh (add to ~/.zshrc):
+echo 'export PATH="$HOME/.2do/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# For Windows PowerShell (run as administrator):
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$HOME\.2do\bin", "User")
 ```
 
 #### Configuration Issues
