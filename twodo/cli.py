@@ -40,6 +40,7 @@ from .automation_engine import AutomationEngine
 from .setup_guide import SetupGuide
 from .mcp_manager import MCPServerManager
 from .updater import UpdateManager
+from .scheduler import Scheduler
 
 
 console = Console()
@@ -1861,6 +1862,249 @@ def automation_status():
         
     except Exception as e:
         console.print(f"❌ Error getting automation status: {e}")
+
+
+@cli.command()
+@click.option('--daemon', '-d', is_flag=True, help='Run scheduler in daemon mode')
+@click.option('--stop', is_flag=True, help='Stop running scheduler daemon')
+def scheduler(daemon, stop):
+    """Start the 2DO task scheduler"""
+    console.print(Panel.fit("📅 2DO Task Scheduler", style="bold cyan"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        scheduler_instance = Scheduler(config_manager)
+        
+        if stop:
+            scheduler_instance.stop()
+            return
+            
+        if daemon:
+            console.print("🔄 Starting scheduler in daemon mode...")
+            console.print("💡 Use 'Ctrl+C' to stop the scheduler")
+            
+            scheduler_instance.start()
+            
+            try:
+                # Keep the scheduler running
+                import signal
+                import time
+                
+                def signal_handler(sig, frame):
+                    console.print("\n🛑 Stopping scheduler...")
+                    scheduler_instance.stop()
+                    exit(0)
+                    
+                signal.signal(signal.SIGINT, signal_handler)
+                signal.signal(signal.SIGTERM, signal_handler)
+                
+                while True:
+                    time.sleep(1)
+                    
+            except KeyboardInterrupt:
+                scheduler_instance.stop()
+        else:
+            # Show scheduler status and schedules
+            status = scheduler_instance.get_status()
+            
+            console.print(f"\n📊 Scheduler Status:")
+            console.print(f"  • Running: {'✅ Yes' if status['running'] else '❌ No'}")
+            console.print(f"  • Total schedules: {status['schedule_count']}")
+            console.print(f"  • Enabled schedules: {status['enabled_schedules']}")
+            
+            if status['schedule_count'] > 0:
+                scheduler_instance.load_schedules()
+                scheduler_instance.list_schedules()
+            else:
+                console.print("\n💡 No schedules configured. Use 'schedule add' to create your first schedule.")
+                
+            console.print("\n🔧 Available scheduler commands:")
+            console.print("  • [bold]2do scheduler --daemon[/bold] - Start scheduler daemon")
+            console.print("  • [bold]2do schedule add[/bold] - Add new schedule")
+            console.print("  • [bold]2do schedule list[/bold] - List all schedules")
+            console.print("  • [bold]2do schedule remove[/bold] - Remove a schedule")
+            console.print("  • [bold]2do schedule trigger[/bold] - Manually trigger a schedule")
+            
+    except Exception as e:
+        console.print(f"❌ Error with scheduler: {e}")
+
+
+@cli.group()
+def schedule():
+    """Manage scheduled tasks"""
+    pass
+
+
+@schedule.command()
+@click.option('--name', prompt='Schedule name', help='Name for the schedule')
+@click.option('--schedule', prompt='Schedule (cron expression)', help='Cron expression (e.g., "0 7 * * 1-5" for 7 AM weekdays)')
+@click.option('--description', prompt='Description', help='Description of what this schedule does')
+def add(name, schedule, description):
+    """Add a new schedule interactively"""
+    console.print(Panel.fit("➕ Add New Schedule", style="bold green"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        scheduler_instance = Scheduler(config_manager)
+        
+        # Create schedule configuration
+        schedule_config = {
+            'name': name,
+            'description': description,
+            'schedule': schedule,
+            'enabled': True,
+            'tasks': []
+        }
+        
+        # Interactive task configuration
+        console.print("\n📋 Now let's add tasks to your schedule:")
+        console.print("Available task types:")
+        console.print("  1. github_sync - Sync GitHub issues and create todos")
+        console.print("  2. multitask - Run multitasking on pending todos")
+        console.print("  3. add_todo - Add a new todo")
+        console.print("  4. create_branch - Create git branch for issue")
+        console.print("  5. github_pr - Create GitHub pull request")
+        console.print("  6. custom_command - Run custom shell command")
+        console.print("  7. ai_prompt - Execute AI prompt")
+        
+        while True:
+            add_task = _safe_confirm("\nAdd a task to this schedule?", default=True)
+            if not add_task:
+                break
+                
+            task_type = _safe_prompt("Task type (1-7)", default="1")
+            task_map = {
+                '1': 'github_sync',
+                '2': 'multitask', 
+                '3': 'add_todo',
+                '4': 'create_branch',
+                '5': 'github_pr',
+                '6': 'custom_command',
+                '7': 'ai_prompt'
+            }
+            
+            task_type_name = task_map.get(task_type, 'github_sync')
+            task_config = _get_task_config(task_type_name)
+            
+            schedule_config['tasks'].append({
+                'type': task_type_name,
+                'config': task_config
+            })
+            
+            console.print(f"✅ Added {task_type_name} task")
+        
+        if not schedule_config['tasks']:
+            console.print("❌ At least one task is required for a schedule")
+            return
+            
+        # Add the schedule
+        if scheduler_instance.add_schedule(schedule_config):
+            console.print(f"✅ Successfully created schedule: {name}")
+            console.print(f"📅 Next run: Check with '2do scheduler' command")
+        else:
+            console.print("❌ Failed to create schedule")
+            
+    except Exception as e:
+        console.print(f"❌ Error adding schedule: {e}")
+
+
+@schedule.command()
+def list():
+    """List all schedules"""
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        scheduler_instance = Scheduler(config_manager)
+        
+        scheduler_instance.load_schedules()
+        scheduler_instance.list_schedules()
+        
+    except Exception as e:
+        console.print(f"❌ Error listing schedules: {e}")
+
+
+@schedule.command()
+@click.argument('name')
+def remove(name):
+    """Remove a schedule"""
+    console.print(f"🗑️ Removing schedule: {name}")
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        scheduler_instance = Scheduler(config_manager)
+        
+        scheduler_instance.load_schedules()
+        
+        if _safe_confirm(f"Are you sure you want to remove '{name}'?", default=False):
+            if scheduler_instance.remove_schedule(name):
+                console.print(f"✅ Successfully removed schedule: {name}")
+            else:
+                console.print(f"❌ Failed to remove schedule: {name}")
+        else:
+            console.print("❌ Cancelled")
+            
+    except Exception as e:
+        console.print(f"❌ Error removing schedule: {e}")
+
+
+@schedule.command()
+@click.argument('name')
+def trigger(name):
+    """Manually trigger a schedule"""
+    console.print(f"🔧 Manually triggering schedule: {name}")
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        scheduler_instance = Scheduler(config_manager)
+        
+        scheduler_instance.load_schedules()
+        scheduler_instance.trigger_schedule(name)
+        
+    except Exception as e:
+        console.print(f"❌ Error triggering schedule: {e}")
+
+
+def _get_task_config(task_type):
+    """Get configuration for a specific task type"""
+    config = {}
+    
+    if task_type == 'github_sync':
+        config['action'] = 'sync_issues'
+        config['create_todos'] = _safe_confirm("Create todos from synced issues?", default=True)
+        
+    elif task_type == 'multitask':
+        priority_filter = _safe_prompt("Priority filter (high/medium/low or empty for all)", default="")
+        if priority_filter:
+            config['filter'] = f"priority:{priority_filter}"
+        config['max_parallel'] = int(_safe_prompt("Max parallel tasks", default="3"))
+        
+    elif task_type == 'add_todo':
+        config['content'] = _safe_prompt("Todo content")
+        config['type'] = _safe_prompt("Todo type (code/text/image/general)", default="general")
+        config['priority'] = _safe_prompt("Priority (high/medium/low)", default="medium")
+        
+    elif task_type == 'create_branch':
+        config['issue_number'] = _safe_prompt("GitHub issue number (or leave empty for latest)")
+        config['branch_prefix'] = _safe_prompt("Branch prefix", default="issue")
+        
+    elif task_type == 'github_pr':
+        config['title'] = _safe_prompt("PR title")
+        config['body'] = _safe_prompt("PR body", default="")
+        config['branch'] = _safe_prompt("Source branch")
+        
+    elif task_type == 'custom_command':
+        config['command'] = _safe_prompt("Shell command to execute")
+        config['working_dir'] = _safe_prompt("Working directory", default=_get_safe_working_directory())
+        
+    elif task_type == 'ai_prompt':
+        config['prompt'] = _safe_prompt("AI prompt")
+        config['model'] = _safe_prompt("Preferred model (or 'auto')", default="auto")
+        
+    return config
 
 
 def main():

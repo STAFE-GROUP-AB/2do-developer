@@ -1,0 +1,22 @@
+{
+  "name": "daily-github-sync",
+  "description": "Sync GitHub issues daily at 7 AM on weekdays and work on high priority todos",
+  "schedule": "0 7 * * 1-5",
+  "enabled": true,
+  "tasks": [
+    {
+      "type": "github_sync",
+      "config": {
+        "action": "sync_issues",
+        "create_todos": true
+      }
+    },
+    {
+      "type": "multitask",
+      "config": {
+        "filter": "priority:high",
+        "max_parallel": 3
+      }
+    }
+  ]
+}
