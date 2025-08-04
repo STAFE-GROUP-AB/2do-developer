@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
 from dataclasses import dataclass, asdict
+from rich.console import Console
 
 @dataclass
 class Todo:
@@ -39,7 +40,32 @@ class TodoManager:
         else:
             self.todo_dir = Path.home() / ".2do" / "todos"
         self.todo_file = self.todo_dir / "todos.json"
-        self.todo_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create directory with error handling
+        try:
+            self.todo_dir.mkdir(parents=True, exist_ok=True)
+        except (OSError, PermissionError) as e:
+            # Fallback to a different location if we can't create the directory
+            console = Console()
+            console.print(f"⚠️ Cannot create todo directory at {self.todo_dir}: {e}")
+            
+            # Try user's home directory as fallback
+            fallback_dir = Path.home() / ".2do_fallback" / "todos"
+            try:
+                fallback_dir.mkdir(parents=True, exist_ok=True)
+                self.todo_dir = fallback_dir
+                self.todo_file = self.todo_dir / "todos.json"
+                console.print(f"📁 Using fallback directory: {self.todo_dir}")
+            except (OSError, PermissionError):
+                # If even fallback fails, use a temporary directory
+                import tempfile
+                temp_dir = Path(tempfile.gettempdir()) / "2do_todos"
+                temp_dir.mkdir(exist_ok=True)
+                self.todo_dir = temp_dir
+                self.todo_file = self.todo_dir / "todos.json"
+                console.print(f"📁 Using temporary directory: {self.todo_dir}")
+                console.print("⚠️ Todos will not persist between sessions")
+        
         self.todos = self._load_todos()
     
     def _load_todos(self) -> List[Dict]:
@@ -50,9 +76,24 @@ class TodoManager:
         return []
     
     def _save_todos(self):
-        """Save todos to file"""
-        with open(self.todo_file, 'w') as f:
-            json.dump(self.todos, f, indent=2, default=str)
+        """Save todos to file with error handling"""
+        try:
+            with open(self.todo_file, 'w') as f:
+                json.dump(self.todos, f, indent=2, default=str)
+        except (OSError, PermissionError) as e:
+            console = Console()
+            console.print(f"❌ Cannot save todos to {self.todo_file}: {e}")
+            
+            # Try to save to a backup location
+            backup_file = self.todo_file.parent / f"todos_backup_{int(datetime.now().timestamp())}.json"
+            try:
+                with open(backup_file, 'w') as f:
+                    json.dump(self.todos, f, indent=2, default=str)
+                console.print(f"💾 Saved todos to backup file: {backup_file}")
+            except Exception as backup_error:
+                console.print(f"❌ Cannot save backup either: {backup_error}")
+                console.print("⚠️ Todo changes are not persisted - they will be lost when the session ends")
+                raise Exception(f"Cannot save todos: {e}") from e
     
     def add_todo(self, title: str, description: str, todo_type: str, priority: str, content: Optional[str] = None) -> str:
         """Add a new todo item"""

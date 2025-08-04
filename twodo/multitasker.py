@@ -13,15 +13,20 @@ console = Console()
 class Multitasker:
     """Manages parallel execution of todos using optimal AI models"""
     
-    def __init__(self, ai_router):
+    def __init__(self, ai_router, todo_manager=None):
         self.ai_router = ai_router
+        self.todo_manager = todo_manager
         self.max_workers = 5  # Maximum concurrent tasks
     
     async def process_todo_async(self, todo: Dict) -> Dict:
         """Process a single todo asynchronously"""
+        todo_id = todo["id"]
         try:
-            # Update status to in_progress
-            todo["status"] = "in_progress"
+            # Update status to in_progress and persist to file
+            if self.todo_manager:
+                self.todo_manager.update_todo_status(todo_id, "in_progress")
+            else:
+                todo["status"] = "in_progress"
             
             # Create prompt based on todo type and content
             prompt = self._create_prompt_for_todo(todo)
@@ -29,17 +34,39 @@ class Multitasker:
             # Route to best AI model and process
             result = self.ai_router.route_and_process(prompt)
             
-            # Update todo with result
-            todo["status"] = "completed"
-            todo["result"] = result
-            
-            return todo
+            # Update todo with result and persist to file
+            if self.todo_manager:
+                # Get the model that was selected for this task
+                assigned_model = getattr(self.ai_router, 'last_selected_model', 'auto')
+                self.todo_manager.update_todo_status(todo_id, "completed", result, assigned_model)
+                # Return updated todo from manager to ensure consistency
+                updated_todo = self.todo_manager.get_todo_by_id(todo_id)
+                return updated_todo if updated_todo else todo
+            else:
+                todo["status"] = "completed"
+                todo["result"] = result
+                return todo
             
         except Exception as e:
-            console.print(f"❌ Error processing todo {todo['id']}: {str(e)}")
-            todo["status"] = "failed"
-            todo["result"] = f"Error: {str(e)}"
-            return todo
+            error_msg = f"Error: {str(e)}"
+            console.print(f"❌ Error processing todo {todo_id}: {error_msg}")
+            
+            # Update status to failed and persist to file
+            if self.todo_manager:
+                try:
+                    self.todo_manager.update_todo_status(todo_id, "failed", error_msg)
+                    updated_todo = self.todo_manager.get_todo_by_id(todo_id)
+                    return updated_todo if updated_todo else todo
+                except Exception as save_error:
+                    console.print(f"⚠️ Could not save todo status: {save_error}")
+                    # Fall back to in-memory update
+                    todo["status"] = "failed"
+                    todo["result"] = error_msg
+                    return todo
+            else:
+                todo["status"] = "failed"
+                todo["result"] = error_msg
+                return todo
     
     def _create_prompt_for_todo(self, todo: Dict) -> str:
         """Create an appropriate prompt based on todo type and content"""

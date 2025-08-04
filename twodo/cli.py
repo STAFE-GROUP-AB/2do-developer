@@ -233,7 +233,7 @@ def start(repo, force_analyze):
     
     ai_router = AIRouter(config_manager)
     todo_manager = TodoManager(config_manager.config_dir)
-    multitasker = Multitasker(ai_router)
+    multitasker = Multitasker(ai_router, todo_manager)
     tech_detector = TechStackDetector(config_manager.config_dir)
     browser_integration = BrowserIntegration(working_dir)
     image_handler = ImageHandler()
