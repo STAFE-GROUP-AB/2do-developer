@@ -844,9 +844,9 @@ def handle_chat(ai_router, image_handler):
             if hasattr(ai_router, 'route_and_process_with_image'):
                 response = ai_router.route_and_process_with_image(prompt, image_path)
             else:
-                response = ai_router.route_and_process(f"{prompt}\n\n[Image: {image_path}]")
+                response = asyncio.run(ai_router.route_and_process(f"{prompt}\n\n[Image: {image_path}]"))
         else:
-            response = ai_router.route_and_process(prompt_with_image)
+            response = asyncio.run(ai_router.route_and_process(prompt_with_image))
         console.print(f"\n🤖 AI: {response}\n")
 
 def handle_parse_markdown(todo_manager, working_dir):
@@ -1319,10 +1319,10 @@ def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, 
         title = Prompt.ask("Todo title", default=suggested_title)
     else:
         # Use AI to suggest a title based on user input
-        ai_suggestion = ai_router.route_and_process(
+        ai_suggestion = asyncio.run(ai_router.route_and_process(
             f"Based on this request: '{user_input}', suggest a concise todo title (max 60 characters). "
             f"Just return the title, nothing else."
-        )
+        ))
         title = Prompt.ask("Todo title", default=ai_suggestion.strip())
     
     # Validate title is not empty
@@ -1498,7 +1498,7 @@ If this is a technical question, provide clear explanations with code examples w
         enhanced_prompt += f"\n\n[Image attached: {clipboard_image_path}]"
     
     # Route to best AI model with developer context
-    response = ai_router.route_and_process(enhanced_prompt)
+    response = asyncio.run(ai_router.route_and_process(enhanced_prompt))
     console.print(f"\n🤖 {response}\n")
     
     # Offer follow-up suggestions

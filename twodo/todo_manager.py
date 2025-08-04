@@ -314,7 +314,8 @@ class TodoManager:
         """
         
         try:
-            response = ai_router.route_and_process(prompt)
+            import asyncio
+            response = asyncio.run(ai_router.route_and_process(prompt))
             return self._parse_ai_subtasks_response(response, parent_todo)
         except Exception as e:
             print(f"AI sub-task generation failed: {e}")
