@@ -5,9 +5,11 @@ AI Router - Intelligent routing of prompts to the best AI model
 import asyncio
 import json
 from typing import Dict, List, Optional
+from dataclasses import dataclass
+import openai
+import anthropic
 from rich.console import Console
 from .config import ConfigManager
-from .models import ModelConfig
 from .mcp_client import MCPClient
 
 # Conditional import for Google Generative AI
