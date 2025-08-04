@@ -832,10 +832,89 @@ When contributing, please follow these architectural principles:
 5. **Tag Release**: Create a git tag with the version number
 6. **GitHub Release**: Create a GitHub release with release notes
 
+## Troubleshooting
+
+### Common Issues
+
+#### Installation Problems
+**Issue**: `pip install` fails with permission errors
+```bash
+# Solution: Use user installation
+pip install --user -e .
+```
+
+**Issue**: Python version compatibility errors
+```bash
+# Solution: Check Python version and upgrade if needed
+python --version  # Should be 3.8+
+# On Ubuntu/Debian: sudo apt update && sudo apt install python3.10
+# On macOS: brew install python@3.10  
+# On Windows: Download from python.org
+```
+
+#### Configuration Issues
+**Issue**: API keys not being recognized
+```bash
+# Solution: Verify configuration
+2do setup  # Re-run setup wizard
+# Or check config file directly
+cat ~/.2do/config.yaml
+```
+
+**Issue**: GitHub integration not working
+```bash
+# Solution: Verify token permissions
+# Token needs: repo, issues, pull_requests permissions
+# Create new token at: https://github.com/settings/tokens
+```
+
+#### Runtime Problems
+**Issue**: Browser integration fails to start
+- **Cause**: Port already in use or server command not found
+- **Solution**: Check if development server is already running, install missing dependencies
+
+**Issue**: AI model routing errors
+- **Cause**: Invalid API keys or network connectivity
+- **Solution**: Verify API keys and internet connection, check provider status pages
+
+**Issue**: Todo persistence problems  
+- **Cause**: File permission issues or disk space
+- **Solution**: Check directory permissions for `~/.2do/` or project `2DO/` folder
+
+### Performance Optimization
+
+#### Memory Usage
+If experiencing high memory usage:
+```bash
+# Reduce concurrent tasks
+# Edit ~/.2do/config.yaml and set:
+multitasking:
+  max_workers: 3  # Default is 5
+```
+
+#### API Rate Limits
+To avoid rate limiting:
+- Use smaller batch sizes for multitasking
+- Configure appropriate delays between requests
+- Monitor your API usage on provider dashboards
+
+### Getting Help
+
+1. **Documentation**: Review this README and inline help (`2do --help`)
+2. **Issues**: Search existing [GitHub Issues](https://github.com/STAFE-GROUP-AB/2do-developer/issues)
+3. **Community**: Start a [GitHub Discussion](https://github.com/STAFE-GROUP-AB/2do-developer/discussions)
+4. **Bug Reports**: Create detailed issue reports with reproduction steps
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-For issues and feature requests, please visit the [GitHub Issues](https://github.com/STAFE-GROUP-AB/AI-Redirector/issues) page.
+For issues and feature requests, please visit the [GitHub Issues](https://github.com/STAFE-GROUP-AB/2do-developer/issues) page.
+
+### Additional Resources
+- **Repository**: [STAFE-GROUP-AB/2do-developer](https://github.com/STAFE-GROUP-AB/2do-developer)  
+- **Discussions**: [Community discussions and Q&A](https://github.com/STAFE-GROUP-AB/2do-developer/discussions)
+- **Documentation**: Comprehensive documentation in this README
+- **Examples**: See demo files and test cases in the repository
