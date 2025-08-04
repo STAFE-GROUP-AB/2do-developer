@@ -235,45 +235,64 @@ class UpdateManager:
             return False
     
     def update_via_installer_script(self) -> bool:
-        """Update using the original installer script"""
+        """Update using direct installation method (bypasses problematic installer script)"""
         try:
-            console.print("🚀 Updating via installer script...")
+            console.print("🚀 Updating via direct installation...")
             
-            # Determine the appropriate installer script
-            system = platform.system().lower()
-            if system == "windows":
-                script_url = f"https://raw.githubusercontent.com/{self.repo_owner}/{self.repo_name}/main/install.ps1"
-                # For Windows, we need to download and run PowerShell script
-                temp_script = Path(tempfile.gettempdir()) / "2do_update.ps1"
-                
-                response = requests.get(script_url)
-                response.raise_for_status()
-                
-                with open(temp_script, 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                
-                # Run PowerShell script
-                result = subprocess.run([
-                    "powershell", "-ExecutionPolicy", "Bypass", "-File", str(temp_script)
-                ], capture_output=True, text=True)
-                
-                temp_script.unlink()  # Clean up
-                
-            else:
-                # Unix/Linux/macOS
-                script_url = f"https://raw.githubusercontent.com/{self.repo_owner}/{self.repo_name}/main/install.sh"
-                
-                # Download and run the installer script
-                result = subprocess.run([
-                    "bash", "-c", f"curl -fsSL {script_url} | bash"
-                ], capture_output=True, text=True)
+            # Get the virtual environment path
+            venv_path = Path.home() / ".2do"
+            pip_path = venv_path / "bin" / "pip"
             
-            if result.returncode == 0:
-                console.print("✅ Update completed successfully!")
-                return True
-            else:
-                console.print(f"❌ Update failed: {result.stderr}")
+            if not pip_path.exists():
+                console.print("❌ Virtual environment not found. Please reinstall 2do.")
                 return False
+            
+            # Create temporary directory for cloning
+            with tempfile.TemporaryDirectory() as temp_dir:
+                repo_path = Path(temp_dir) / "2do-developer"
+                
+                # Clone the repository
+                console.print("📥 Downloading latest version...")
+                result = subprocess.run([
+                    "git", "clone", f"https://github.com/{self.repo_owner}/{self.repo_name}.git", str(repo_path)
+                ], capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    console.print(f"❌ Failed to download: {result.stderr}")
+                    return False
+                
+                # Ensure python-dotenv is installed first
+                console.print("🔧 Installing dependencies...")
+                result = subprocess.run([
+                    str(pip_path), "install", "python-dotenv"
+                ], capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    console.print(f"❌ Failed to install dependencies: {result.stderr}")
+                    return False
+                
+                # Install the updated package
+                console.print("📦 Installing updated 2do...")
+                result = subprocess.run([
+                    str(pip_path), "install", "--upgrade", str(repo_path)
+                ], capture_output=True, text=True, cwd=str(repo_path))
+                
+                if result.returncode == 0:
+                    console.print("✅ Update completed successfully!")
+                    
+                    # Ensure wrapper script exists
+                    wrapper_path = Path.home() / ".local" / "bin" / "2do"
+                    if not wrapper_path.exists():
+                        console.print("🔧 Creating wrapper script...")
+                        wrapper_path.parent.mkdir(parents=True, exist_ok=True)
+                        wrapper_content = f"#!/bin/bash\n# 2DO wrapper script\nexec {venv_path}/bin/python -m twodo.cli \"$@\""
+                        wrapper_path.write_text(wrapper_content)
+                        wrapper_path.chmod(0o755)
+                    
+                    return True
+                else:
+                    console.print(f"❌ Update failed: {result.stderr}")
+                    return False
                 
         except Exception as e:
             console.print(f"❌ Update failed: {e}")
