@@ -194,7 +194,8 @@ def verify(project):
 
 @cli.command()
 @click.option('--repo', '-r', help='GitHub repository or local path to analyze')
-def start(repo):
+@click.option('--force-analyze', is_flag=True, help='Force re-analysis even if already analyzed')
+def start(repo, force_analyze):
     """Start the 2DO interactive session"""
     console.print(Panel.fit("🤖 2DO Starting...", style="bold green"))
     
@@ -223,11 +224,15 @@ def start(repo):
         console.print("❌ No API keys configured. Please run '2do setup' first.")
         return
     
+    # Check for GitHub connection
+    github_integration = GitHubIntegration(config_manager.get_api_key("github"))
+    if github_integration.github:
+        console.print("✅ GitHub connection established")
+    
     ai_router = AIRouter(config_manager)
     todo_manager = TodoManager(config_manager.config_dir)
     multitasker = Multitasker(ai_router)
     tech_detector = TechStackDetector(config_manager.config_dir)
-    github_integration = GitHubIntegration(config_manager.get_api_key("github"))
     browser_integration = BrowserIntegration(working_dir)
     image_handler = ImageHandler()
     
@@ -238,17 +243,46 @@ def start(repo):
         if repo_info:
             console.print(f"📁 GitHub repository detected: {repo_info['full_name']}")
             console.print(f"🌿 Current branch: {repo_info['current_branch']}")
-    
+
+    # Handle repository analysis with memory
+    tech_stack = []
     if repo or config_manager.is_local_project:
         analysis_path = repo if repo else working_dir
-        console.print(f"📁 Analyzing repository: {analysis_path}")
-        tech_stack = tech_detector.analyze_repo(analysis_path)
-        console.print(f"🔍 Detected tech stack: {', '.join(tech_stack)}")
         
-        # Create memory files for tech stack
-        if Confirm.ask(f"Create memory files for {', '.join(tech_stack)}?"):
-            tech_detector.create_memory_files(tech_stack)
-            console.print("💾 Memory files created")
+        # Check if we should skip analysis
+        should_skip = config_manager.should_skip_analysis(force_analyze)
+        
+        if should_skip and not force_analyze:
+            # Use existing analysis
+            last_analysis = config_manager.get_last_analysis()
+            tech_stack = last_analysis.get("tech_stack", [])
+            
+            if tech_stack:
+                console.print(f"📁 Repository previously analyzed: {analysis_path}")
+                console.print(f"🔍 Using cached tech stack: {', '.join(tech_stack)}")
+                console.print("💡 Use --force-analyze to re-analyze or run '2do analyze'")
+            else:
+                # Fallback to checking existing memory files
+                tech_stack = tech_detector.get_existing_analysis()
+                if tech_stack:
+                    console.print(f"📁 Found existing analysis: {', '.join(tech_stack)}")
+                    config_manager.save_analysis_results(tech_stack, memory_files_created=True)
+        
+        if not tech_stack or force_analyze:
+            # Run fresh analysis
+            console.print(f"📁 Analyzing repository: {analysis_path}")
+            tech_stack = tech_detector.analyze_repo(analysis_path, force_reanalyze=force_analyze)
+            console.print(f"🔍 Detected tech stack: {', '.join(tech_stack)}")
+            
+            # Create memory files for tech stack
+            memory_files_created = False
+            if tech_stack and Confirm.ask(f"Create memory files for {', '.join(tech_stack)}?"):
+                tech_detector.create_memory_files(tech_stack)
+                console.print("💾 Memory files created")
+                memory_files_created = True
+            
+            # Save analysis results
+            config_manager.save_analysis_results(tech_stack, memory_files_created)
     
     # Interactive session
     while True:
@@ -348,6 +382,57 @@ def mcp(project, list_servers, recommend):
     except Exception as e:
         console.print(f"❌ Error during MCP server management: {e}")
         console.print("💡 Try running '2do setup' first to ensure proper configuration")
+
+@cli.command()
+@click.option('--project', '-p', help='Project directory to analyze (default: current directory)')
+@click.option('--force', is_flag=True, help='Force re-analysis even if already analyzed')
+def analyze(project, force):
+    """Analyze repository technology stack and create memory files"""
+    console.print(Panel.fit("🔍 Repository Analysis", style="bold cyan"))
+    
+    # Determine working directory
+    working_dir = project if project else _get_safe_working_directory()
+    
+    try:
+        config_manager = ConfigManager(working_dir)
+        tech_detector = TechStackDetector(config_manager.config_dir)
+        
+        # Check if already analyzed
+        if not force and config_manager.has_been_analyzed():
+            last_analysis = config_manager.get_last_analysis()
+            existing_tech_stack = last_analysis.get("tech_stack", [])
+            
+            console.print(f"📁 Repository was already analyzed")
+            if existing_tech_stack:
+                console.print(f"🔍 Previous tech stack: {', '.join(existing_tech_stack)}")
+            
+            if not _safe_confirm("Re-analyze anyway?", default=False):
+                console.print("⏭️ Analysis skipped")
+                return
+        
+        # Run analysis
+        console.print(f"📁 Analyzing repository: {working_dir}")
+        tech_stack = tech_detector.analyze_repo(working_dir, force_reanalyze=True)
+        
+        if not tech_stack:
+            console.print("⚠️ No technologies detected")
+            return
+            
+        console.print(f"🔍 Detected tech stack: {', '.join(tech_stack)}")
+        
+        # Create memory files
+        memory_files_created = False
+        if _safe_confirm(f"Create memory files for {', '.join(tech_stack)}?", default=True):
+            tech_detector.create_memory_files(tech_stack)
+            console.print("💾 Memory files created")
+            memory_files_created = True
+        
+        # Save analysis results
+        config_manager.save_analysis_results(tech_stack, memory_files_created)
+        console.print("✅ Analysis complete and saved")
+        
+    except Exception as e:
+        console.print(f"❌ Error during analysis: {e}")
 
 def handle_add_todo(todo_manager, ai_router, image_handler):
     """Handle adding a new todo item"""

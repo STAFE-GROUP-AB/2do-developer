@@ -50,7 +50,7 @@ class TechStackDetector:
             "alpinejs": ["package.json"] # Special case, checked in content
         }
     
-    def analyze_repo(self, repo_path: str) -> List[str]:
+    def analyze_repo(self, repo_path: str, force_reanalyze: bool = False) -> List[str]:
         """Analyze repository to detect technology stack"""
         repo_path = Path(repo_path)
         
@@ -80,6 +80,21 @@ class TechStackDetector:
             self._analyze_composer_json(composer_json, detected_techs)
         
         return sorted(list(detected_techs))
+    
+    def get_existing_analysis(self) -> List[str]:
+        """Get tech stack from existing memory files"""
+        tech_stack = []
+        
+        if not self.memory_dir.exists():
+            return tech_stack
+            
+        # Look for existing context files
+        for memory_file in self.memory_dir.glob("*_context.json"):
+            tech_name = memory_file.stem.replace("_context", "")
+            if tech_name != "tech_stack":  # Skip the combined file
+                tech_stack.append(tech_name)
+                
+        return sorted(tech_stack)
     
     def _analyze_file(self, file_path: Path, detected_techs: Set[str]):
         """Analyze a single file to detect technologies"""

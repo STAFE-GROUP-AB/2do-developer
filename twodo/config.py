@@ -58,7 +58,12 @@ class ConfigManager:
                     "max_parallel_tasks": 5,
                     "memory_enabled": True
                 },
-                "mcp_servers": []
+                "mcp_servers": [],
+                "analysis": {
+                    "last_analyzed": None,
+                    "tech_stack": [],
+                    "memory_files_created": False
+                }
             }
             self._save_config()
         
@@ -218,3 +223,48 @@ class ConfigManager:
     def get_mcp_servers(self) -> list:
         """Get configured MCP servers"""
         return self.config["mcp_servers"]
+    
+    def has_been_analyzed(self, repo_path: str = None) -> bool:
+        """Check if repository has been analyzed recently"""
+        analysis_config = self.config.get("analysis", {})
+        last_analyzed = analysis_config.get("last_analyzed")
+        memory_files_created = analysis_config.get("memory_files_created", False)
+        
+        # If never analyzed, return False
+        if not last_analyzed or not memory_files_created:
+            return False
+            
+        # Check if memory files still exist
+        if hasattr(self, 'memory_dir'):
+            memory_dir = self.config_dir / "memory"
+        else:
+            memory_dir = self.config_dir / "memory"
+            
+        if not memory_dir.exists():
+            return False
+            
+        # Check if we have at least one memory file
+        memory_files = list(memory_dir.glob("*_context.json"))
+        return len(memory_files) > 0
+    
+    def get_last_analysis(self) -> dict:
+        """Get the last analysis results"""
+        return self.config.get("analysis", {})
+    
+    def save_analysis_results(self, tech_stack: list, memory_files_created: bool = False):
+        """Save analysis results to config"""
+        import datetime
+        
+        if "analysis" not in self.config:
+            self.config["analysis"] = {}
+            
+        self.config["analysis"]["last_analyzed"] = datetime.datetime.now().isoformat()
+        self.config["analysis"]["tech_stack"] = tech_stack
+        self.config["analysis"]["memory_files_created"] = memory_files_created
+        self._save_config()
+    
+    def should_skip_analysis(self, force_reanalyze: bool = False) -> bool:
+        """Determine if analysis should be skipped"""
+        if force_reanalyze:
+            return False
+        return self.has_been_analyzed()
