@@ -7,6 +7,7 @@ import yaml
 import json
 from pathlib import Path
 from typing import Dict, Optional
+from dotenv import load_dotenv
 
 class ConfigManager:
     """Manages configuration and API keys for AI models"""
@@ -29,6 +30,9 @@ class ConfigManager:
         self.global_config_dir = Path.home() / ".2do"
         self.global_config_file = self.global_config_dir / "config.yaml"
         self.suppress_prompts = suppress_prompts
+        
+        # Load environment variables from .env file
+        self._load_environment_variables()
         
         # Ensure config directory exists with proper error handling
         try:
@@ -63,6 +67,25 @@ class ConfigManager:
         """Check if the path is a git repository"""
         git_dir = Path(path) / ".git"
         return git_dir.exists()
+    
+    def _load_environment_variables(self):
+        """Load environment variables from .env file"""
+        # Try to load from project root first, then from current directory
+        env_paths = []
+        
+        # If we're in a project, look for .env in project root
+        if hasattr(self, 'config_dir') and self.is_local_project:
+            project_root = self.config_dir.parent.parent if self.config_dir.name == '.2do' else self.config_dir.parent
+            env_paths.append(project_root / '.env')
+        
+        # Also check current working directory
+        env_paths.append(Path.cwd() / '.env')
+        
+        # Load from the first .env file found
+        for env_path in env_paths:
+            if env_path.exists():
+                load_dotenv(env_path)
+                break
     
     def _load_config(self):
         """Load configuration from file"""
@@ -214,7 +237,22 @@ class ConfigManager:
         self._save_config()
     
     def get_api_key(self, provider: str) -> Optional[str]:
-        """Get API key for a provider"""
+        """Get API key for a provider - prioritize environment variables over config file"""
+        # Environment variable mapping
+        env_var_map = {
+            'openai': 'OPENAI_API_KEY',
+            'anthropic': 'ANTHROPIC_API_KEY', 
+            'github': 'GITHUB_TOKEN'
+        }
+        
+        # First check environment variables (most secure)
+        env_var = env_var_map.get(provider)
+        if env_var:
+            env_value = os.getenv(env_var)
+            if env_value and env_value.strip():
+                return env_value.strip()
+        
+        # Fallback to config file (for backward compatibility)
         return self.config["api_keys"].get(provider)
     
     def has_api_keys(self) -> bool:
