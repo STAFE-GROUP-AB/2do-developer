@@ -156,9 +156,8 @@ class Multitasker:
                 completed += 1
                 console.print(f"✅ {result['title']} - COMPLETED")
                 if result.get("result"):
-                    # Show first 100 chars of result
-                    preview = result["result"][:100] + "..." if len(result["result"]) > 100 else result["result"]
-                    console.print(f"   📝 Result preview: {preview}")
+                    # Show full result without truncation
+                    console.print(f"   📝 Result: {result['result']}")
             elif status == "failed":
                 failed += 1
                 console.print(f"❌ {result['title']} - FAILED")
