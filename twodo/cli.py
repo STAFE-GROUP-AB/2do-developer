@@ -225,7 +225,7 @@ def start(repo):
     
     ai_router = AIRouter(config_manager)
     todo_manager = TodoManager(config_manager.config_dir)
-    multitasker = Multitasker(ai_router)
+    multitasker = Multitasker(ai_router, todo_manager)
     tech_detector = TechStackDetector(config_manager.config_dir)
     github_integration = GitHubIntegration(config_manager.get_api_key("github"))
     browser_integration = BrowserIntegration(working_dir)

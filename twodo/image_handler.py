@@ -22,8 +22,19 @@ class ImageHandler:
     
     def __init__(self):
         self.console = Console()
-        self.temp_dir = Path(tempfile.gettempdir()) / "twodo_images"
-        self.temp_dir.mkdir(exist_ok=True)
+        # Try to create temp directory with fallbacks
+        try:
+            self.temp_dir = Path(tempfile.gettempdir()) / "twodo_images"
+            self.temp_dir.mkdir(exist_ok=True)
+        except (OSError, PermissionError):
+            # Fallback to system temp with a simpler name
+            try:
+                self.temp_dir = Path(tempfile.gettempdir()) / "2do_img"
+                self.temp_dir.mkdir(exist_ok=True)
+            except (OSError, PermissionError):
+                # Final fallback - use system temp directly
+                self.temp_dir = Path(tempfile.gettempdir())
+                self.console.print("⚠️ Cannot create dedicated image temp directory, using system temp")
     
     def check_clipboard_for_image(self) -> Optional[Image.Image]:
         """Check if clipboard contains an image and return it"""
@@ -123,17 +134,46 @@ class ImageHandler:
         filename = f"{prefix}_{uuid.uuid4().hex[:8]}.png"
         file_path = self.temp_dir / filename
         
-        # Convert to RGB if necessary (for PNG saving)
-        if image.mode in ('RGBA', 'LA', 'P'):
-            # Keep transparency for PNG
-            image.save(file_path, 'PNG')
-        else:
-            # Convert to RGB for other formats
-            if image.mode != 'RGB':
-                image = image.convert('RGB')
-            image.save(file_path, 'PNG')
-        
-        return str(file_path)
+        try:
+            # Convert to RGB if necessary (for PNG saving)
+            if image.mode in ('RGBA', 'LA', 'P'):
+                # Keep transparency for PNG
+                image.save(file_path, 'PNG')
+            else:
+                # Convert to RGB for other formats
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+                image.save(file_path, 'PNG')
+            
+            return str(file_path)
+            
+        except (OSError, PermissionError) as e:
+            self.console.print(f"❌ Cannot save image to {file_path}: {e}")
+            # Try alternative locations
+            fallback_locations = [
+                Path.home() / f"2do_{filename}",
+                Path.cwd() / filename,
+                Path("/tmp") / filename if Path("/tmp").exists() else None
+            ]
+            
+            for fallback_path in fallback_locations:
+                if fallback_path is None:
+                    continue
+                try:
+                    if image.mode in ('RGBA', 'LA', 'P'):
+                        image.save(fallback_path, 'PNG')
+                    else:
+                        if image.mode != 'RGB':
+                            image = image.convert('RGB')
+                        image.save(fallback_path, 'PNG')
+                    
+                    self.console.print(f"💾 Saved image to fallback location: {fallback_path}")
+                    return str(fallback_path)
+                except Exception:
+                    continue
+            
+            # If all locations fail, raise the original error
+            raise Exception(f"Cannot save image file: {e}") from e
     
     def create_ascii_preview(self, image: Image.Image, max_width: int = 60, max_height: int = 20) -> str:
         """Create ASCII art preview of image"""

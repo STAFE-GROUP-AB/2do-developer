@@ -36,6 +36,7 @@ class AIRouter:
         self.config = config_manager
         self.models = self._initialize_models()
         self._setup_clients()
+        self.last_selected_model = None
     
     def _initialize_models(self) -> Dict[str, ModelCapability]:
         """Initialize available models with their capabilities"""
@@ -278,6 +279,7 @@ class AIRouter:
         # Try the best model first
         try:
             model_name = self.select_best_model(prompt)
+            self.last_selected_model = model_name
             return self._process_with_model(model_name, prompt)
         except Exception as e:
             console.print(f"❌ Primary model failed: {str(e)}")
@@ -287,6 +289,7 @@ class AIRouter:
             for fallback_model in fallback_models:
                 try:
                     console.print(f"🔄 Trying fallback model: {fallback_model}")
+                    self.last_selected_model = fallback_model
                     return self._process_with_model(fallback_model, prompt)
                 except Exception as fallback_error:
                     console.print(f"❌ Fallback model {fallback_model} failed: {str(fallback_error)}")
@@ -294,6 +297,7 @@ class AIRouter:
             
             # If all models fail, return error
             console.print(f"❌ All models failed. Last error: {str(e)}")
+            self.last_selected_model = "failed"
             return f"Error: All AI models are currently unavailable. Please check your API keys and try again."
     
     def _process_with_model(self, model_name: str, prompt: str) -> str:

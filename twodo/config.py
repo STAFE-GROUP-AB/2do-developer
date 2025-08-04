@@ -31,10 +31,24 @@ class ConfigManager:
         except (OSError, PermissionError) as e:
             # Fallback to home directory if we can't create the config directory
             if self.is_local_project:
+                from rich.console import Console
+                console = Console()
+                console.print(f"⚠️ Cannot create local 2DO directory at {self.config_dir}: {e}")
+                console.print("💡 Falling back to global configuration")
                 self.config_dir = Path.home() / ".2do"
                 self.config_file = self.config_dir / "config.yaml"
                 self.is_local_project = False
-                self.config_dir.mkdir(exist_ok=True)
+                try:
+                    self.config_dir.mkdir(exist_ok=True)
+                except (OSError, PermissionError) as global_error:
+                    # If even global config fails, use temp directory
+                    import tempfile
+                    temp_dir = Path(tempfile.gettempdir()) / "2do_config"
+                    temp_dir.mkdir(exist_ok=True)
+                    self.config_dir = temp_dir
+                    self.config_file = self.config_dir / "config.yaml"
+                    console.print(f"⚠️ Using temporary configuration directory: {self.config_dir}")
+                    console.print("⚠️ Configuration will not persist between sessions")
             else:
                 raise
         
