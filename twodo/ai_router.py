@@ -296,6 +296,33 @@ class AIRouter:
             return success
         return True
     
+    def _add_file_operation_instructions(self, prompt: str) -> str:
+        """Add explicit file operation instructions to prompt when filesystem tools are available"""
+        file_operation_context = """
+IMPORTANT: You have access to filesystem tools and can perform real file operations. When the task involves:
+- Creating, updating, or modifying files (like README.md, code files, documentation)
+- Reading file contents for analysis
+- Creating directories or organizing files
+
+You MUST use the available filesystem tools to perform these operations directly. Do NOT just provide suggestions or examples.
+
+Available tools:
+- read_file: Read contents of existing files
+- write_file: Create new files or completely replace existing file contents
+- create_directory: Create new directories
+- list_directory: List contents of directories
+
+For tasks like "update README.md" or "create documentation", you should:
+1. First read the existing file (if it exists) using read_file
+2. Analyze the current content and requirements
+3. Use write_file to create or update the file with the new content
+4. Confirm the operation was successful
+
+Always perform the actual file operations - do not just suggest what should be done.
+"""
+        
+        return f"{file_operation_context}\n\nUser Request: {prompt}"
+    
     def route_and_process(self, prompt: str, todo_context: str = None) -> str:
         """Route prompt to best model and process it"""
         # Enhance prompt with developer context if available
@@ -345,8 +372,13 @@ class AIRouter:
         try:
             client = self.clients["openai"]
             
+            # Enhance prompt with file operation instructions if filesystem is available
+            enhanced_prompt = prompt
+            if self.filesystem_initialized:
+                enhanced_prompt = self._add_file_operation_instructions(prompt)
+            
             # Prepare messages
-            messages = [{"role": "user", "content": prompt}]
+            messages = [{"role": "user", "content": enhanced_prompt}]
             
             # Add filesystem tools if available
             tools = None
@@ -446,10 +478,15 @@ class AIRouter:
         try:
             client = self.clients["anthropic"]
             
+            # Enhance prompt with file operation instructions if filesystem is available
+            enhanced_prompt = prompt
+            if self.filesystem_initialized:
+                enhanced_prompt = self._add_file_operation_instructions(prompt)
+            
             response = client.messages.create(
                 model=model_name,
                 max_tokens=4000,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": enhanced_prompt}]
             )
             
             return response.content[0].text
@@ -473,7 +510,12 @@ class AIRouter:
             client = self.clients["google"]
             model = client.GenerativeModel(model_name)
             
-            response = model.generate_content(prompt)
+            # Enhance prompt with file operation instructions if filesystem is available
+            enhanced_prompt = prompt
+            if self.filesystem_initialized:
+                enhanced_prompt = self._add_file_operation_instructions(prompt)
+            
+            response = model.generate_content(enhanced_prompt)
             
             if response.text:
                 return response.text
