@@ -186,7 +186,7 @@ class AutomationEngine:
     async def run_all_todos(self) -> bool:
         """Run multitasking on all pending todos - the ultimate shortcut"""
         todos = self.todo_manager.get_todos()
-        pending_todos = [todo for todo in todos if todo.status == 'pending']
+        pending_todos = [todo for todo in todos if todo.get('status') == 'pending']
         
         if not pending_todos:
             console.print("📭 No pending todos to run!")
@@ -203,7 +203,7 @@ class AutomationEngine:
         # Show the todos that will be processed
         console.print("\n📋 Todos to process:")
         for i, todo in enumerate(pending_todos[:5], 1):  # Show first 5
-            console.print(f"  {i}. {todo.title}")
+            console.print(f"  {i}. {todo.get('title', 'Untitled')}")
         
         if len(pending_todos) > 5:
             console.print(f"  ... and {len(pending_todos) - 5} more")

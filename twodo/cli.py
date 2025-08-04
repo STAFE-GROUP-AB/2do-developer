@@ -12,6 +12,7 @@ except (ImportError, AttributeError):
     # If urllib3 not available or warning type doesn't exist, ignore
     pass
 
+import asyncio
 import click
 import os
 import yaml
