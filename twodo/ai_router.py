@@ -4,6 +4,8 @@ AI Router - Intelligent routing of prompts to the best AI model
 
 import asyncio
 import json
+import os
+from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 
@@ -61,7 +63,7 @@ class AIRouter:
                 "gpt-4o": ModelCapability(
                     name="gpt-4o",
                     provider="openai",
-                    strengths=["reasoning", "complex_tasks", "code_analysis", "multimodal", "general"],
+                    strengths=["reasoning", "complex_tasks", "code_analysis", "multimodal", "general", "tall_stack", "testing"],
                     context_length=128000,
                     cost_per_token=0.005,
                     speed_rating=8,
@@ -70,7 +72,7 @@ class AIRouter:
                 "gpt-4o-mini": ModelCapability(
                     name="gpt-4o-mini",
                     provider="openai",
-                    strengths=["speed", "general", "simple_tasks", "cost_effective"],
+                    strengths=["speed", "general", "simple_tasks", "cost_effective", "code", "multimodal"],
                     context_length=128000,
                     cost_per_token=0.0002,
                     speed_rating=9,
@@ -79,7 +81,7 @@ class AIRouter:
                 "gpt-4": ModelCapability(
                     name="gpt-4",
                     provider="openai",
-                    strengths=["reasoning", "complex_tasks", "code_analysis", "general"],
+                    strengths=["reasoning", "complex_tasks", "code_analysis", "general", "architecture"],
                     context_length=8192,
                     cost_per_token=0.03,
                     speed_rating=6,
@@ -88,7 +90,7 @@ class AIRouter:
                 "gpt-3.5-turbo": ModelCapability(
                     name="gpt-3.5-turbo",
                     provider="openai",
-                    strengths=["speed", "general", "simple_tasks"],
+                    strengths=["speed", "general", "simple_tasks", "code"],
                     context_length=4096,
                     cost_per_token=0.002,
                     speed_rating=9,
@@ -97,7 +99,7 @@ class AIRouter:
                 "gpt-4-turbo": ModelCapability(
                     name="gpt-4-turbo",
                     provider="openai",
-                    strengths=["code", "reasoning", "large_context", "analysis"],
+                    strengths=["code", "reasoning", "large_context", "analysis", "multimodal", "refactoring"],
                     context_length=128000,
                     cost_per_token=0.01,
                     speed_rating=7,
@@ -143,7 +145,7 @@ class AIRouter:
                 "claude-3-5-sonnet-20241022": ModelCapability(
                     name="claude-3-5-sonnet-20241022",
                     provider="anthropic",
-                    strengths=["reasoning", "creative", "complex_analysis", "code", "balanced"],
+                    strengths=["reasoning", "creative", "complex_analysis", "code", "balanced", "refactoring", "debugging", "tall_stack"],
                     context_length=200000,
                     cost_per_token=0.003,
                     speed_rating=8,
@@ -152,7 +154,7 @@ class AIRouter:
                 "claude-3-5-haiku-20241022": ModelCapability(
                     name="claude-3-5-haiku-20241022",
                     provider="anthropic",
-                    strengths=["speed", "simple_tasks", "quick_answers"],
+                    strengths=["speed", "simple_tasks", "quick_answers", "code", "testing"],
                     context_length=200000,
                     cost_per_token=0.00025,
                     speed_rating=10,
@@ -161,7 +163,7 @@ class AIRouter:
                 "claude-3-opus-20240229": ModelCapability(
                     name="claude-3-opus-20240229",
                     provider="anthropic",
-                    strengths=["reasoning", "creative", "complex_analysis"],
+                    strengths=["reasoning", "creative", "complex_analysis", "architecture", "documentation"],
                     context_length=200000,
                     cost_per_token=0.015,
                     speed_rating=5,
@@ -180,7 +182,7 @@ class AIRouter:
                 "gemini-1.5-pro": ModelCapability(
                     name="gemini-1.5-pro",
                     provider="google",
-                    strengths=["reasoning", "complex_tasks", "multimodal", "large_context", "analysis"],
+                    strengths=["reasoning", "complex_tasks", "multimodal", "large_context", "analysis", "code", "tall_stack"],
                     context_length=2000000,  # 2M tokens
                     cost_per_token=0.0035,
                     speed_rating=7,
@@ -189,7 +191,7 @@ class AIRouter:
                 "gemini-1.5-flash": ModelCapability(
                     name="gemini-1.5-flash",
                     provider="google",
-                    strengths=["speed", "general", "multimodal", "balanced"],
+                    strengths=["speed", "general", "multimodal", "balanced", "code", "testing"],
                     context_length=1000000,  # 1M tokens
                     cost_per_token=0.00015,
                     speed_rating=9,
@@ -198,7 +200,7 @@ class AIRouter:
                 "gemini-1.0-pro": ModelCapability(
                     name="gemini-1.0-pro",
                     provider="google",
-                    strengths=["general", "reasoning", "balanced"],
+                    strengths=["general", "reasoning", "balanced", "code"],
                     context_length=32000,
                     cost_per_token=0.0005,
                     speed_rating=8,
@@ -343,8 +345,8 @@ class AIRouter:
             genai.configure(api_key=self.config.get_api_key("google"))
             self.clients["google"] = genai
     
-    def analyze_prompt(self, prompt: str) -> Dict[str, float]:
-        """Analyze prompt to determine task type and requirements"""
+    def analyze_prompt(self, prompt: str, file_context: Dict = None) -> Dict[str, float]:
+        """Enhanced prompt analysis with development-specific intelligence"""
         prompt_lower = prompt.lower()
         
         analysis = {
@@ -355,87 +357,369 @@ class AIRouter:
             "analysis": 0.0,
             "simple_tasks": 0.0,
             "complex_tasks": 0.0,
-            "large_context": 0.0
+            "large_context": 0.0,
+            "multimodal": 0.0,
+            "tall_stack": 0.0,
+            "refactoring": 0.0,
+            "testing": 0.0,
+            "documentation": 0.0,
+            "debugging": 0.0,
+            "architecture": 0.0
         }
         
-        # Code-related keywords
-        code_keywords = ['code', 'programming', 'function', 'class', 'debug', 'script', 'algorithm', 'git', 'repository']
-        if any(keyword in prompt_lower for keyword in code_keywords):
-            analysis["code"] += 0.8
+        # Enhanced code-related analysis
+        code_keywords = {
+            'basic': ['code', 'programming', 'function', 'class', 'method', 'variable'],
+            'advanced': ['algorithm', 'optimization', 'refactor', 'architecture', 'design pattern'],
+            'debugging': ['debug', 'error', 'bug', 'fix', 'trace', 'troubleshoot'],
+            'testing': ['test', 'unit test', 'integration', 'mock', 'assert', 'coverage'],
+            'git': ['git', 'commit', 'branch', 'merge', 'pull request', 'repository']
+        }
         
-        # Reasoning keywords
-        reasoning_keywords = ['analyze', 'explain', 'why', 'how', 'compare', 'evaluate', 'reason', 'logic']
-        if any(keyword in prompt_lower for keyword in reasoning_keywords):
-            analysis["reasoning"] += 0.7
+        for category, keywords in code_keywords.items():
+            if any(keyword in prompt_lower for keyword in keywords):
+                if category == 'basic':
+                    analysis["code"] += 0.7
+                elif category == 'advanced':
+                    analysis["code"] += 0.9
+                    analysis["complex_tasks"] += 0.6
+                elif category == 'debugging':
+                    analysis["debugging"] += 0.9
+                    analysis["reasoning"] += 0.5
+                elif category == 'testing':
+                    analysis["testing"] += 0.9
+                    analysis["code"] += 0.6
+                elif category == 'git':
+                    analysis["code"] += 0.5
         
-        # Creative keywords
-        creative_keywords = ['create', 'write', 'story', 'creative', 'generate', 'design', 'idea']
+        # TALL Stack specific analysis
+        tall_keywords = {
+            'laravel': ['laravel', 'artisan', 'eloquent', 'blade', 'composer', 'php'],
+            'tailwind': ['tailwind', 'tailwindcss', 'css', 'styling', 'utility class'],
+            'alpine': ['alpine', 'alpine.js', 'x-data', 'x-show', 'x-if'],
+            'livewire': ['livewire', 'wire:', 'component', 'reactive']
+        }
+        
+        for category, keywords in tall_keywords.items():
+            if any(keyword in prompt_lower for keyword in keywords):
+                analysis["tall_stack"] += 0.8
+                analysis["code"] += 0.6
+                if category == 'laravel':
+                    analysis["complex_tasks"] += 0.5
+        
+        # File context analysis (if provided)
+        if file_context:
+            file_ext = file_context.get('extension', '').lower()
+            file_type = file_context.get('type', '')
+            
+            # Adjust analysis based on file type
+            if file_ext in ['.php', '.blade.php']:
+                analysis["tall_stack"] += 0.6
+                analysis["code"] += 0.7
+            elif file_ext in ['.js', '.ts', '.vue']:
+                analysis["code"] += 0.8
+                if 'alpine' in file_context.get('content', '').lower():
+                    analysis["tall_stack"] += 0.5
+            elif file_ext in ['.css', '.scss']:
+                if 'tailwind' in file_context.get('content', '').lower():
+                    analysis["tall_stack"] += 0.7
+            elif file_ext in ['.md', '.txt']:
+                analysis["documentation"] += 0.8
+                analysis["creative"] += 0.4
+        
+        # Enhanced reasoning analysis
+        reasoning_keywords = {
+            'basic': ['analyze', 'explain', 'why', 'how', 'compare'],
+            'advanced': ['evaluate', 'reason', 'logic', 'deduce', 'infer', 'conclude'],
+            'architectural': ['design', 'structure', 'pattern', 'best practice', 'principle']
+        }
+        
+        for category, keywords in reasoning_keywords.items():
+            if any(keyword in prompt_lower for keyword in keywords):
+                if category == 'basic':
+                    analysis["reasoning"] += 0.6
+                elif category == 'advanced':
+                    analysis["reasoning"] += 0.8
+                elif category == 'architectural':
+                    analysis["architecture"] += 0.9
+                    analysis["reasoning"] += 0.7
+        
+        # Creative and documentation analysis
+        creative_keywords = ['create', 'write', 'story', 'creative', 'generate', 'design', 'idea', 'documentation']
+        doc_keywords = ['document', 'readme', 'guide', 'tutorial', 'docs', 'comment', 'api doc']
+        
         if any(keyword in prompt_lower for keyword in creative_keywords):
             analysis["creative"] += 0.6
         
-        # Speed indicators
-        speed_keywords = ['quick', 'fast', 'simple', 'brief', 'short']
+        if any(keyword in prompt_lower for keyword in doc_keywords):
+            analysis["documentation"] += 0.8
+            analysis["creative"] += 0.4
+        
+        # Speed and complexity analysis
+        speed_keywords = ['quick', 'fast', 'simple', 'brief', 'short', 'immediately']
+        complex_keywords = ['complex', 'detailed', 'comprehensive', 'thorough', 'deep', 'complete']
+        refactor_keywords = ['refactor', 'restructure', 'reorganize', 'optimize', 'improve']
+        
         if any(keyword in prompt_lower for keyword in speed_keywords):
             analysis["speed"] += 0.9
         
-        # Complex task indicators
-        complex_keywords = ['complex', 'detailed', 'comprehensive', 'thorough', 'deep']
         if any(keyword in prompt_lower for keyword in complex_keywords):
             analysis["complex_tasks"] += 0.8
         
-        # Length-based analysis
-        if len(prompt) < 100:
-            analysis["simple_tasks"] += 0.5
-            analysis["speed"] += 0.3
-        elif len(prompt) > 1000:
-            analysis["large_context"] += 0.7
-            analysis["complex_tasks"] += 0.4
+        if any(keyword in prompt_lower for keyword in refactor_keywords):
+            analysis["refactoring"] += 0.9
+            analysis["code"] += 0.7
+        
+        # Multimodal analysis
+        multimodal_keywords = ['image', 'picture', 'screenshot', 'diagram', 'visual', 'ui', 'design']
+        if any(keyword in prompt_lower for keyword in multimodal_keywords):
+            analysis["multimodal"] += 0.9
+        
+        # Length-based analysis (enhanced)
+        if len(prompt) < 50:
+            analysis["simple_tasks"] += 0.7
+            analysis["speed"] += 0.5
+        elif len(prompt) < 200:
+            analysis["simple_tasks"] += 0.3
+            analysis["speed"] += 0.2
+        elif len(prompt) > 1500:
+            analysis["large_context"] += 0.8
+            analysis["complex_tasks"] += 0.6
+        elif len(prompt) > 800:
+            analysis["large_context"] += 0.4
+            analysis["complex_tasks"] += 0.3
         
         return analysis
     
-    def select_best_model(self, prompt: str, todo_context: str = None) -> str:
-        """Select the best model for a given prompt with optional todo context"""
+    def select_best_model(self, prompt: str, todo_context: str = None, file_context: Dict = None) -> str:
+        """Enhanced model selection with development-specific intelligence"""
         if not self.models:
             raise ValueError("No AI models configured. Please run setup first.")
         
-        analysis = self.analyze_prompt(prompt)
+        analysis = self.analyze_prompt(prompt, file_context)
         scores = {}
         
         for model_name, model in self.models.items():
             score = 0.0
             
-            # Score based on model strengths and prompt analysis
+            # Base scoring for model strengths
             for strength in model.strengths:
                 if strength in analysis:
                     score += analysis[strength] * 10
             
-            # Adjust for speed if speed is important
-            if analysis.get("speed", 0) > 0.5:
-                score += model.speed_rating * analysis["speed"]
+            # Enhanced scoring logic
             
-            # Adjust for cost efficiency (prefer cheaper models for simple tasks)
-            if analysis.get("simple_tasks", 0) > 0.5:
-                score += (1.0 / model.cost_per_token) * 0.1
+            # TALL Stack specialization bonus
+            if analysis.get("tall_stack", 0) > 0.3:
+                if model.provider == "anthropic" and "claude-3-5" in model.name:
+                    score += 15  # Claude 3.5 excels at PHP/Laravel
+                elif model.provider == "openai" and "gpt-4o" in model.name:
+                    score += 12  # GPT-4o is great for full-stack
+                elif model.provider == "google" and "gemini" in model.name:
+                    score += 8   # Gemini is decent for web dev
             
-            # Adjust for context length requirements
+            # Code-specific bonuses
+            if analysis.get("code", 0) > 0.5:
+                if "gpt-4" in model.name or "claude-3" in model.name:
+                    score += 10  # Premium models for complex code
+                if model.provider == "anthropic":
+                    score += 5   # Anthropic models are great for code
+            
+            # Debugging and troubleshooting
+            if analysis.get("debugging", 0) > 0.5:
+                if "claude-3-5-sonnet" in model.name:
+                    score += 20  # Claude 3.5 Sonnet excels at debugging
+                elif "gpt-4o" in model.name:
+                    score += 15
+            
+            # Testing and quality assurance
+            if analysis.get("testing", 0) > 0.5:
+                if model.provider == "openai" and "gpt-4" in model.name:
+                    score += 12  # GPT-4 models are good for test generation
+                elif "claude-3" in model.name:
+                    score += 10
+            
+            # Architecture and design patterns
+            if analysis.get("architecture", 0) > 0.5:
+                if "claude-3-opus" in model.name:
+                    score += 18  # Opus is excellent for architectural decisions
+                elif "gpt-4" in model.name:
+                    score += 15
+            
+            # Documentation tasks
+            if analysis.get("documentation", 0) > 0.5:
+                if "claude-3" in model.name:
+                    score += 12  # Claude models excel at documentation
+                elif "gpt-4" in model.name:
+                    score += 10
+            
+            # Refactoring tasks
+            if analysis.get("refactoring", 0) > 0.5:
+                if "claude-3-5-sonnet" in model.name:
+                    score += 18  # Sonnet is excellent for refactoring
+                elif "gpt-4" in model.name:
+                    score += 12
+            
+            # Multimodal tasks (images, UI, etc.)
+            if analysis.get("multimodal", 0) > 0.5:
+                if "gpt-4o" in model.name or "gpt-4-turbo" in model.name:
+                    score += 20  # GPT-4o/Turbo have vision capabilities
+                elif "claude-3" in model.name:
+                    score += 15  # Claude 3 has vision
+                elif "gemini" in model.name:
+                    score += 12  # Gemini has multimodal capabilities
+            
+            # Speed optimization
+            if analysis.get("speed", 0) > 0.7:
+                score += model.speed_rating * analysis["speed"] * 2
+                # Bonus for fast models on speed-critical tasks
+                if model.speed_rating >= 9:
+                    score += 10
+            
+            # Cost efficiency for simple tasks
+            if analysis.get("simple_tasks", 0) > 0.6:
+                if model.is_free:
+                    score += 15  # Strong preference for free models on simple tasks
+                else:
+                    cost_efficiency = (1.0 / model.cost_per_token) * 0.2
+                    score += cost_efficiency
+            
+            # Large context handling
             if analysis.get("large_context", 0) > 0.5:
-                score += (model.context_length / 10000) * analysis["large_context"]
+                context_bonus = (model.context_length / 50000) * analysis["large_context"] * 5
+                score += min(context_bonus, 20)  # Cap the bonus
+            
+            # Complex task handling
+            if analysis.get("complex_tasks", 0) > 0.5:
+                if not model.is_free:  # Premium models for complex tasks
+                    score += 8
+                if model.context_length > 50000:  # Large context helps with complexity
+                    score += 5
+            
+            # File context bonuses
+            if file_context:
+                file_ext = file_context.get('extension', '').lower()
+                if file_ext in ['.php', '.blade.php'] and "claude" in model.name:
+                    score += 8  # Claude is excellent for PHP
+                elif file_ext in ['.js', '.ts', '.vue'] and "gpt-4" in model.name:
+                    score += 6  # GPT-4 is great for JavaScript
+                elif file_ext in ['.css', '.scss'] and analysis.get("tall_stack", 0) > 0:
+                    score += 5  # Any good model for TailwindCSS
             
             scores[model_name] = score
         
         # Return the model with the highest score
         best_model = max(scores.items(), key=lambda x: x[1])[0]
         
-        # Show model selection with context
+        # Enhanced logging with analysis insights
+        analysis_summary = []
+        for key, value in analysis.items():
+            if value > 0.3:
+                analysis_summary.append(f"{key}({value:.1f})")
+        
+        analysis_text = ", ".join(analysis_summary) if analysis_summary else "general"
+        
         if todo_context:
-            console.print(f"🎯 Selected [bold yellow]{best_model}[/bold yellow] for: [italic]{todo_context}[/italic] (score: {scores[best_model]:.2f})")
+            console.print(f"🎯 Selected [bold yellow]{best_model}[/bold yellow] for: [italic]{todo_context}[/italic]")
+            console.print(f"   📊 Analysis: {analysis_text} | Score: {scores[best_model]:.1f}")
         else:
-            console.print(f"🎯 Selected model: {best_model} (score: {scores[best_model]:.2f})")
+            console.print(f"🎯 Selected model: [bold yellow]{best_model}[/bold yellow] (score: {scores[best_model]:.1f})")
+            console.print(f"   📊 Analysis: {analysis_text}")
+        
+        self.last_selected_model = best_model
         return best_model
     
-    def set_developer_context(self, context: str):
-        """Set developer context for enhanced prompts"""
-        self.developer_context = context
+    def get_development_context(self, project_path: str = None, files: List[str] = None) -> Dict:
+        """Analyze development context from project structure and files"""
+        context = {
+            "project_type": "unknown",
+            "technologies": [],
+            "complexity": "medium",
+            "file_types": [],
+            "frameworks": [],
+            "suggested_model_type": "general"
+        }
+        
+        if not project_path and not files:
+            return context
+        
+        # If we have files, analyze them
+        if files:
+            for file_path in files:
+                file_ext = Path(file_path).suffix.lower()
+                context["file_types"].append(file_ext)
+                
+                # Analyze file extension for technology
+                if file_ext in ['.php', '.blade.php']:
+                    context["technologies"].append("php")
+                    context["frameworks"].append("laravel")
+                    context["suggested_model_type"] = "tall_stack"
+                elif file_ext in ['.js', '.jsx']:
+                    context["technologies"].append("javascript")
+                    if any('react' in f.lower() for f in files):
+                        context["frameworks"].append("react")
+                elif file_ext in ['.ts', '.tsx']:
+                    context["technologies"].append("typescript")
+                elif file_ext in ['.vue']:
+                    context["technologies"].append("vue")
+                    context["frameworks"].append("vue")
+                elif file_ext in ['.py']:
+                    context["technologies"].append("python")
+                elif file_ext in ['.css', '.scss']:
+                    context["technologies"].append("css")
+                    if any('tailwind' in f.lower() for f in files):
+                        context["frameworks"].append("tailwindcss")
+        
+        # If we have a project path, analyze structure
+        if project_path and Path(project_path).exists():
+            project_files = []
+            for root, dirs, files_in_dir in os.walk(project_path):
+                # Skip common ignore directories
+                dirs[:] = [d for d in dirs if d not in ['node_modules', 'vendor', '.git', '__pycache__']]
+                for file in files_in_dir[:50]:  # Limit analysis to first 50 files
+                    project_files.append(file)
+            
+            # Detect TALL stack
+            has_laravel = any('artisan' in f or 'composer.json' in f for f in project_files)
+            has_tailwind = any('tailwind.config' in f for f in project_files)
+            has_alpine = any('.js' in f for f in project_files)  # Simplified check
+            has_livewire = has_laravel  # Assume Livewire if Laravel
+            
+            if has_laravel and has_tailwind:
+                context["project_type"] = "tall_stack"
+                context["suggested_model_type"] = "tall_stack"
+                context["frameworks"] = ["laravel", "tailwindcss"]
+                if has_alpine:
+                    context["frameworks"].append("alpine")
+                if has_livewire:
+                    context["frameworks"].append("livewire")
+            
+            # Detect other project types
+            elif any('package.json' in f for f in project_files):
+                context["project_type"] = "javascript"
+                if any('react' in f.lower() for f in project_files):
+                    context["frameworks"].append("react")
+                elif any('vue' in f.lower() for f in project_files):
+                    context["frameworks"].append("vue")
+                elif any('angular' in f.lower() for f in project_files):
+                    context["frameworks"].append("angular")
+            
+            elif any('requirements.txt' in f or 'pyproject.toml' in f for f in project_files):
+                context["project_type"] = "python"
+                if any('django' in f.lower() for f in project_files):
+                    context["frameworks"].append("django")
+                elif any('flask' in f.lower() for f in project_files):
+                    context["frameworks"].append("flask")
+        
+        # Determine complexity based on analysis
+        if len(context["frameworks"]) > 2:
+            context["complexity"] = "high"
+        elif len(context["frameworks"]) > 0:
+            context["complexity"] = "medium"
+        else:
+            context["complexity"] = "low"
+        
+        return context
     
     async def initialize_filesystem(self, project_path: str = None):
         """Initialize MCP filesystem server for file operations (legacy method)"""

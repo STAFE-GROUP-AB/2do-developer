@@ -40,6 +40,7 @@ from .automation_engine import AutomationEngine
 from .setup_guide import SetupGuide
 from .mcp_manager import MCPServerManager
 from .updater import UpdateManager
+from .smart_code_analyzer import SmartCodeAnalyzer
 
 
 console = Console()
@@ -1862,6 +1863,278 @@ def automation_status():
     except Exception as e:
         console.print(f"❌ Error getting automation status: {e}")
 
+
+@cli.command()
+@click.option('--project', '-p', help='Project path to analyze (default: current directory)')
+@click.option('--file', '-f', help='Specific file to analyze')
+@click.option('--max-files', default=50, help='Maximum number of files to analyze')
+def smart_analyze(project, file, max_files):
+    """Smart code analysis for enhanced development intelligence"""
+    console.print(Panel.fit("🧠 Smart Code Analysis", style="bold blue"))
+    
+    try:
+        analyzer = SmartCodeAnalyzer()
+        
+        if file:
+            # Analyze single file
+            console.print(f"📄 Analyzing file: {file}")
+            analysis = analyzer.analyze_file(file)
+            
+            if not analysis:
+                console.print("❌ Could not analyze file (unsupported format or file not found)")
+                return
+            
+            # Display file analysis
+            _display_file_analysis(analysis)
+            
+        else:
+            # Analyze project
+            project_path = project or os.getcwd()
+            console.print(f"📁 Analyzing project: {project_path}")
+            
+            project_analysis = analyzer.analyze_project(project_path, max_files)
+            
+            if not project_analysis.file_analyses:
+                console.print("❌ No code files found to analyze")
+                return
+            
+            # Display project analysis
+            _display_project_analysis(project_analysis)
+            
+            # Show intelligent suggestions
+            suggestions = analyzer.get_intelligent_suggestions(project_analysis)
+            if suggestions:
+                console.print("\n💡 Intelligent Development Suggestions:")
+                for i, suggestion in enumerate(suggestions, 1):
+                    console.print(f"   {i}. {suggestion}")
+            
+    except Exception as e:
+        console.print(f"❌ Error during analysis: {e}")
+
+@cli.command()
+@click.option('--project', '-p', help='Project path (default: current directory)')
+def smart_todo(project):
+    """Create intelligent todos based on code analysis"""
+    console.print(Panel.fit("🎯 Smart Todo Generation", style="bold green"))
+    
+    try:
+        project_path = project or os.getcwd()
+        analyzer = SmartCodeAnalyzer()
+        
+        # Analyze project
+        console.print(f"🔍 Analyzing project for todo opportunities: {project_path}")
+        project_analysis = analyzer.analyze_project(project_path, 30)
+        
+        if not project_analysis.file_analyses:
+            console.print("❌ No code files found to analyze")
+            return
+        
+        # Generate smart todos
+        smart_todos = _generate_smart_todos(project_analysis)
+        
+        if not smart_todos:
+            console.print("✅ No immediate development tasks identified!")
+            return
+        
+        console.print(f"\n📋 Generated {len(smart_todos)} smart development todos:")
+        
+        # Initialize todo manager
+        config_manager = ConfigManager()
+        todo_manager = TodoManager(config_manager.config_dir)
+        
+        for i, todo_data in enumerate(smart_todos, 1):
+            console.print(f"   {i}. {todo_data['content'][:80]}...")
+            
+            if Confirm.ask(f"Create this todo?", default=True):
+                todo_id = todo_manager.add_todo(
+                    content=todo_data['content'],
+                    todo_type="code",
+                    priority=todo_data['priority']
+                )
+                console.print(f"      ✅ Created todo #{todo_id}")
+        
+        console.print(f"\n🎉 Smart todo generation complete!")
+        
+    except Exception as e:
+        console.print(f"❌ Error generating smart todos: {e}")
+
+@cli.command()
+@click.option('--project', '-p', help='Project path (default: current directory)')
+def tall_stack_check(project):
+    """Analyze TALL stack completeness and provide recommendations"""
+    console.print(Panel.fit("🏗️ TALL Stack Analysis", style="bold yellow"))
+    
+    try:
+        project_path = project or os.getcwd()
+        
+        # Initialize tech stack detector
+        config_manager = ConfigManager()
+        tech_detector = TechStackDetector(config_manager.config_dir)
+        
+        # Analyze TALL stack completeness
+        tall_analysis = tech_detector.analyze_tall_stack_completeness(project_path)
+        
+        # Display results
+        console.print(f"\n📊 TALL Stack Analysis for: {project_path}")
+        console.print(f"Completeness Score: {tall_analysis['completeness_score']:.0f}%")
+        console.print(f"Is TALL Stack: {'✅ Yes' if tall_analysis['is_tall_stack'] else '❌ No'}")
+        
+        # Show components
+        console.print("\n🔧 TALL Stack Components:")
+        components = tall_analysis['components']
+        
+        tailwind_status = "✅" if components['tailwindcss'] else "❌"
+        alpine_status = "✅" if components['alpinejs'] else "❌"
+        laravel_status = "✅" if components['laravel'] else "❌"
+        livewire_status = "✅" if components['livewire'] else "❌"
+        
+        console.print(f"   {tailwind_status} TailwindCSS - Utility-first CSS framework")
+        console.print(f"   {alpine_status} Alpine.js - Minimal reactive framework")
+        console.print(f"   {laravel_status} Laravel - PHP web application framework")
+        console.print(f"   {livewire_status} Livewire - Dynamic Laravel components")
+        
+        # Show detected files
+        if any(tall_analysis['detected_files'].values()):
+            console.print("\n📄 Detected Files:")
+            for component, files in tall_analysis['detected_files'].items():
+                if files:
+                    console.print(f"   {component.capitalize()}: {', '.join(files[:3])}")
+        
+        # Show recommendations
+        if tall_analysis['recommendations']:
+            console.print("\n💡 Recommendations:")
+            for i, rec in enumerate(tall_analysis['recommendations'], 1):
+                console.print(f"   {i}. {rec}")
+        
+        # Suggest MCP servers based on analysis
+        if tall_analysis['is_tall_stack']:
+            console.print("\n🔌 Recommended MCP Servers for TALL Stack:")
+            console.print("   • Context7 (Upstash) - Advanced context management")
+            console.print("   • PHP MCP Server - PHP code execution")
+            console.print("   • Git MCP Server - Version control operations")
+            console.print("   • GitHub MCP Server - Repository integration")
+            console.print("\n💡 Run '2do mcp' to configure these servers")
+        
+    except Exception as e:
+        console.print(f"❌ Error analyzing TALL stack: {e}")
+
+def _display_file_analysis(analysis):
+    """Display analysis results for a single file"""
+    console.print(f"\n📄 File: {analysis.file_path}")
+    console.print(f"Language: {analysis.language}")
+    console.print(f"Complexity Score: {analysis.complexity_score}")
+    
+    if analysis.functions:
+        console.print(f"Functions: {len(analysis.functions)}")
+        for func in analysis.functions[:5]:  # Show first 5
+            console.print(f"   • {func['name']} (line {func.get('line', 'unknown')})")
+    
+    if analysis.classes:
+        console.print(f"Classes: {len(analysis.classes)}")
+        for cls in analysis.classes[:5]:  # Show first 5
+            console.print(f"   • {cls['name']} (line {cls.get('line', 'unknown')})")
+    
+    if analysis.tech_stack_hints:
+        console.print(f"Tech Stack Hints: {', '.join(analysis.tech_stack_hints)}")
+    
+    if analysis.suggestions:
+        console.print("Suggestions:")
+        for sugg in analysis.suggestions:
+            console.print(f"   • {sugg}")
+
+def _display_project_analysis(analysis):
+    """Display analysis results for an entire project"""
+    console.print(f"\n📁 Project: {analysis.project_path}")
+    console.print(f"Files Analyzed: {len(analysis.file_analyses)}")
+    console.print(f"Overall Complexity: {analysis.overall_complexity}")
+    
+    if analysis.tech_stack:
+        console.print(f"Detected Technologies: {', '.join(analysis.tech_stack)}")
+    
+    if analysis.architecture_patterns:
+        console.print(f"Architecture Patterns: {', '.join(analysis.architecture_patterns)}")
+    
+    # Show file breakdown by language
+    languages = {}
+    for file_analysis in analysis.file_analyses:
+        lang = file_analysis.language
+        languages[lang] = languages.get(lang, 0) + 1
+    
+    if languages:
+        console.print("File Types:")
+        for lang, count in languages.items():
+            console.print(f"   • {lang}: {count} files")
+    
+    if analysis.recommendations:
+        console.print("Project Recommendations:")
+        for rec in analysis.recommendations:
+            console.print(f"   • {rec}")
+
+def _generate_smart_todos(project_analysis):
+    """Generate intelligent todos based on project analysis"""
+    todos = []
+    
+    # High complexity files need refactoring
+    for file_analysis in project_analysis.file_analyses:
+        if file_analysis.complexity_score > 30:
+            todos.append({
+                'content': f"Refactor high-complexity file: {Path(file_analysis.file_path).name} (complexity: {file_analysis.complexity_score})",
+                'priority': 'high',
+                'type': 'code'
+            })
+    
+    # Missing TALL stack components
+    tech_stack = set(project_analysis.tech_stack)
+    if 'laravel' in tech_stack:
+        if 'livewire' not in tech_stack:
+            todos.append({
+                'content': "Consider adding Livewire for reactive PHP components without complex JavaScript",
+                'priority': 'medium',
+                'type': 'code'
+            })
+        
+        if 'tailwind' not in tech_stack:
+            todos.append({
+                'content': "Add TailwindCSS for utility-first styling approach",
+                'priority': 'medium',
+                'type': 'code'
+            })
+        
+        if 'alpine' not in tech_stack:
+            todos.append({
+                'content': "Add Alpine.js for lightweight reactive frontend components",
+                'priority': 'low',
+                'type': 'code'
+            })
+    
+    # Large functions/classes need attention
+    for file_analysis in project_analysis.file_analyses:
+        large_functions = [f for f in file_analysis.functions if f.get('complexity', 0) > 10]
+        if large_functions:
+            for func in large_functions[:2]:  # Limit to 2 per file
+                todos.append({
+                    'content': f"Refactor complex function: {func['name']} in {Path(file_analysis.file_path).name}",
+                    'priority': 'medium',
+                    'type': 'code'
+                })
+    
+    # Add testing suggestions
+    if not any('test' in fa.file_path.lower() for fa in project_analysis.file_analyses):
+        todos.append({
+            'content': "Add unit tests for better code quality and maintainability",
+            'priority': 'high',
+            'type': 'code'
+        })
+    
+    # Documentation suggestions
+    if project_analysis.overall_complexity == 'high' and len(project_analysis.file_analyses) > 10:
+        todos.append({
+            'content': "Create comprehensive project documentation due to high complexity",
+            'priority': 'medium',
+            'type': 'text'
+        })
+    
+    return todos[:10]  # Limit to 10 todos
 
 def main():
     """Main entry point"""

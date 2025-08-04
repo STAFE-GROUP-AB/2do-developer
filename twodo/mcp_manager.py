@@ -143,42 +143,86 @@ class MCPServerManager:
             }
         }
     
-    def get_recommended_servers(self, detected_technologies: List[str]) -> List[Dict]:
-        """Get recommended MCP servers based on detected technologies"""
+    def get_recommended_servers(self, detected_technologies: List[str], project_context: Dict = None) -> List[Dict]:
+        """Enhanced intelligent MCP server recommendations based on project context"""
         recommended = []
         
         # Convert detected technologies to lowercase for matching
         detected_tech_lower = [tech.lower() for tech in detected_technologies]
         
-        # Always include essential servers (especially context7)
-        for server_id, server_info in self.mcp_servers["essential"].items():
-            recommended.append({
-                "id": server_id,
-                "category": "essential",
-                **server_info,
-                "match_reason": "Essential for all projects"
-            })
+        # Enhanced scoring system for recommendations
+        server_scores = {}
         
-        # Add servers based on detected technologies
+        # Always include essential servers with high base scores
+        for server_id, server_info in self.mcp_servers["essential"].items():
+            score = 100  # High base score for essential servers
+            if server_id == "context7":
+                score = 150  # Highest priority for Context7
+            
+            server_scores[f"essential_{server_id}"] = {
+                "server": server_info,
+                "category": "essential", 
+                "id": server_id,
+                "score": score,
+                "match_reason": "Essential for intelligent development workflow"
+            }
+        
+        # Analyze all server categories for matches
         for category, servers in self.mcp_servers.items():
             if category == "essential":
-                continue  # Already added above
+                continue  # Already processed
                 
             for server_id, server_info in servers.items():
                 server_technologies = [tech.lower() for tech in server_info["technologies"]]
                 
-                # Check if any detected technology matches server technologies
+                # Calculate match score
                 matches = set(detected_tech_lower) & set(server_technologies)
                 if matches:
-                    recommended.append({
-                        "id": server_id,
+                    base_score = len(matches) * 20  # 20 points per technology match
+                    
+                    # Bonus scoring based on project context
+                    if project_context:
+                        if project_context.get("project_type") == "tall_stack":
+                            # TALL stack specific bonuses
+                            if server_id in ["php", "git", "github"]:
+                                base_score += 30
+                            elif server_id in ["nodejs", "sqlite"]:
+                                base_score += 20
+                        
+                        elif project_context.get("project_type") == "javascript":
+                            if server_id in ["nodejs", "git", "github"]:
+                                base_score += 30
+                        
+                        elif project_context.get("project_type") == "python":
+                            if server_id in ["python", "git", "github"]:
+                                base_score += 30
+                    
+                    # Category-based scoring adjustments
+                    if category == "development":
+                        base_score += 10  # Development tools are generally useful
+                    elif category == "languages" and matches:
+                        base_score += 15  # Language-specific tools get priority
+                    
+                    server_scores[f"{category}_{server_id}"] = {
+                        "server": server_info,
                         "category": category,
-                        **server_info,
-                        "match_reason": f"Matches detected: {', '.join(matches)}"
-                    })
+                        "id": server_id, 
+                        "score": base_score,
+                        "match_reason": f"Matches detected: {', '.join(matches)} (Score: {base_score})"
+                    }
         
-        # Sort by priority (lower number = higher priority)
-        recommended.sort(key=lambda x: x["priority"])
+        # Convert to list and sort by score (descending)
+        sorted_servers = sorted(server_scores.values(), key=lambda x: x["score"], reverse=True)
+        
+        # Format for output
+        for server_data in sorted_servers:
+            recommended.append({
+                "id": server_data["id"],
+                "category": server_data["category"],
+                "score": server_data["score"],
+                **server_data["server"],
+                "match_reason": server_data["match_reason"]
+            })
         
         return recommended
     
