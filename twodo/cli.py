@@ -491,6 +491,45 @@ def update(check_only, force):
         console.print(f"❌ Update error: {e}")
         raise click.ClickException("Update process failed")
 
+
+@cli.command("add-ai")
+@click.option('--provider', help='AI provider name (e.g., openai, anthropic, google)')
+@click.option('--model', help='Model name (e.g., gpt-4, claude-3-opus)')
+@click.option('--api-key', help='API key for the provider')
+@click.option('--list-supported', is_flag=True, help='Show supported models from built-in list')
+def add_ai(provider, model, api_key, list_supported):
+    """Add AI models and providers with your own API keys"""
+    console.print(Panel.fit("🤖 Add AI Models", style="bold blue"))
+    
+    # Initialize config manager
+    working_dir = os.getcwd()
+    config_manager = ConfigManager(working_dir)
+    
+    if list_supported:
+        _show_supported_models()
+        return
+    
+    # Interactive mode if no options provided
+    if not provider and not model and not api_key:
+        _interactive_add_ai(config_manager)
+    else:
+        _direct_add_ai(config_manager, provider, model, api_key)
+
+
+@cli.command("ai-list")
+@click.option('--show-free', is_flag=True, help='Show only free models')
+@click.option('--show-configured', is_flag=True, help='Show only configured models')
+def ai_list(show_free, show_configured):
+    """List all available AI models and their status"""
+    console.print(Panel.fit("🤖 Available AI Models", style="bold blue"))
+    
+    # Initialize components
+    working_dir = os.getcwd() 
+    config_manager = ConfigManager(working_dir)
+    ai_router = AIRouter(config_manager)
+    
+    _display_ai_models(ai_router, config_manager, show_free, show_configured)
+
 def handle_add_todo(todo_manager, ai_router, image_handler):
     """Handle adding a new todo item"""
     title = Prompt.ask("Todo title")
@@ -1352,6 +1391,194 @@ If this is a technical question, provide clear explanations with code examples w
     console.print("   • 'Add a todo for implementing this'")
     console.print("   • 'Create a GitHub issue about this'")
     console.print("   • 'Show me my current tasks' to see what else you're working on")
+
+
+def _show_supported_models():
+    """Show all supported models from the built-in list"""
+    console.print("\n🎯 Supported AI Models:")
+    
+    # Free models (included by default)
+    console.print("\n💚 [bold green]Free Models (Included by Default):[/bold green]")
+    free_models = [
+        ("OpenAI", "gpt-4o-mini", "Fast, cost-effective model"),
+        ("OpenAI", "gpt-3.5-turbo", "General purpose, high speed"),
+        ("Anthropic", "claude-3-5-haiku", "Ultra-fast simple tasks"),
+        ("Google", "gemini-1.5-flash", "Fast multimodal model"),
+    ]
+    
+    for provider, model, description in free_models:
+        console.print(f"   • [cyan]{provider}[/cyan] - [yellow]{model}[/yellow]: {description}")
+    
+    # Premium models (require API keys)
+    console.print("\n💰 [bold yellow]Premium Models (Require API Keys):[/bold yellow]")
+    premium_models = [
+        ("OpenAI", "gpt-4o", "Advanced reasoning and multimodal"),
+        ("OpenAI", "gpt-4", "Complex reasoning and analysis"),
+        ("OpenAI", "gpt-4-turbo", "Large context code analysis"),
+        ("Anthropic", "claude-3-5-sonnet", "Balanced performance"),
+        ("Anthropic", "claude-3-opus", "Advanced reasoning"),
+        ("Google", "gemini-1.5-pro", "Large context multimodal"),
+        ("xAI", "grok-4", "Latest xAI model (if available)"),
+        ("DeepSeek", "deepseek-v3", "Code and reasoning model"),
+        ("Mistral", "mistral-large-2", "Advanced reasoning"),
+        ("Cohere", "command-r-plus", "Enterprise command model"),
+        ("Perplexity", "pplx-70b-online", "Search-augmented model"),
+    ]
+    
+    for provider, model, description in premium_models:
+        console.print(f"   • [cyan]{provider}[/cyan] - [yellow]{model}[/yellow]: {description}")
+    
+    console.print(f"\n💡 Use [bold]2do add-ai[/bold] to add any of these models with your API key")
+
+
+def _interactive_add_ai(config_manager):
+    """Interactive AI model addition"""
+    
+    # Show current providers
+    current_providers = config_manager.get_available_providers()
+    if current_providers:
+        console.print(f"\n📋 Currently configured providers: {', '.join(current_providers)}")
+    
+    console.print("\n🎯 Choose how to add AI models:")
+    console.print("   1. Add from supported list")
+    console.print("   2. Add custom provider/model")
+    
+    choice = Prompt.ask("Your choice", choices=["1", "2"], default="1")
+    
+    if choice == "1":
+        _add_from_supported_list(config_manager)
+    else:
+        _add_custom_model(config_manager)
+
+
+def _add_from_supported_list(config_manager):
+    """Add model from supported list"""
+    
+    console.print("\n🤖 Available providers:")
+    providers = ["openai", "anthropic", "google", "xai", "deepseek", "mistral", "cohere", "perplexity"]
+    for i, provider in enumerate(providers, 1):
+        has_key = "✅" if config_manager.get_api_key(provider) else "❌"
+        console.print(f"   {i}. {provider} {has_key}")
+    
+    provider_choice = Prompt.ask("Choose provider (1-8)", choices=[str(i) for i in range(1, 9)])
+    provider = providers[int(provider_choice) - 1]
+    
+    # Check if API key exists
+    if not config_manager.get_api_key(provider):
+        api_key = Prompt.ask(f"Enter {provider} API key", password=True)
+        config_manager.set_api_key(provider, api_key)
+        console.print(f"✅ API key saved for {provider}")
+    else:
+        console.print(f"✅ Using existing {provider} API key")
+    
+    console.print(f"\n🎉 {provider} models are now available!")
+    console.print(f"💡 Use [bold]2do ai-list[/bold] to see all available models")
+
+
+def _add_custom_model(config_manager):
+    """Add custom provider and model"""
+    
+    provider = Prompt.ask("Provider name (e.g., 'my-custom-provider')")
+    api_key = Prompt.ask("API key", password=True)
+    
+    # Save the API key
+    config_manager.set_api_key(provider, api_key)
+    
+    console.print(f"✅ Custom provider '{provider}' added!")
+    console.print("⚠️  Note: You'll need to modify the AI router code to add the actual model implementation")
+
+
+def _direct_add_ai(config_manager, provider, model, api_key):
+    """Direct AI model addition with command line arguments"""
+    
+    if not provider:
+        console.print("❌ Provider is required")
+        return
+    
+    if not api_key:
+        api_key = Prompt.ask(f"Enter API key for {provider}", password=True)
+    
+    config_manager.set_api_key(provider, api_key)
+    console.print(f"✅ API key saved for {provider}")
+    
+    if model:
+        console.print(f"💡 Model '{model}' will be available if supported by {provider}")
+
+
+def _display_ai_models(ai_router, config_manager, show_free, show_configured):
+    """Display AI models in a formatted table"""
+    
+    # Get all models (both configured and potential)
+    configured_models = ai_router.models
+    available_providers = config_manager.get_available_providers()
+    
+    # Create table
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Provider", style="cyan")
+    table.add_column("Model", style="yellow") 
+    table.add_column("Status", style="green")
+    table.add_column("Type", style="blue")
+    table.add_column("Speed", style="white")
+    table.add_column("Strengths", style="dim")
+    
+    # Add configured models
+    for model_name, model in configured_models.items():
+        status = "✅ Ready"
+        model_type = "💚 Free" if model.is_free else "💰 Paid"
+        speed = "⚡" * (model.speed_rating // 2) if model.speed_rating else "❓"
+        strengths = ", ".join(model.strengths[:3])  # Show first 3 strengths
+        
+        if show_free and not model.is_free:
+            continue
+        if show_configured:  # All configured models are shown
+            pass
+            
+        table.add_row(
+            model.provider.title(),
+            model_name,
+            status,
+            model_type,
+            speed,
+            strengths
+        )
+    
+    # Add potential models for providers with API keys but no models loaded
+    potential_models = {
+        "xai": [("grok-4", "Advanced reasoning", 7, ["reasoning", "general"])],
+        "deepseek": [
+            ("deepseek-v3", "Code and reasoning", 6, ["code", "reasoning"]),
+            ("deepseek-r1", "Advanced reasoner", 5, ["reasoning", "analysis"])
+        ],
+        "mistral": [("mistral-large-2", "Advanced model", 7, ["reasoning", "code"])],
+        "cohere": [("command-r-plus", "Command model", 6, ["general", "reasoning"])],
+        "perplexity": [("pplx-70b-online", "Search model", 8, ["search", "general"])]
+    }
+    
+    for provider in available_providers:
+        if provider in potential_models and provider not in [m.provider for m in configured_models.values()]:
+            for model_name, description, speed, strengths in potential_models[provider]:
+                status = "⚠️  Available"
+                model_type = "💰 Paid"
+                speed_display = "⚡" * (speed // 2)
+                strengths_str = ", ".join(strengths)
+                
+                if show_free:  # Skip paid models when showing only free
+                    continue
+                    
+                table.add_row(
+                    provider.title(),
+                    model_name,
+                    status,
+                    model_type,
+                    speed_display,
+                    strengths_str
+                )
+    
+    console.print(table)
+    
+    if not show_configured:
+        console.print(f"\n💡 Models marked '⚠️  Available' need provider implementation")
+        console.print(f"💡 Use [bold]2do add-ai --list-supported[/bold] to see all supported models")
 
 
 def main():
