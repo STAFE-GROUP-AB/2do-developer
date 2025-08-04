@@ -918,3 +918,5 @@ For issues and feature requests, please visit the [GitHub Issues](https://github
 - **Discussions**: [Community discussions and Q&A](https://github.com/STAFE-GROUP-AB/2do-developer/discussions)
 - **Documentation**: Comprehensive documentation in this README
 - **Examples**: See demo files and test cases in the repository
+
+Andreas Kviby
