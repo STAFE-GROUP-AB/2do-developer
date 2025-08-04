@@ -35,6 +35,15 @@ class IntentRouter:
                         r"remind\s+me\s+(to|about)",
                         r"need\s+to\s+(do|work\s+on|finish|complete)",
                         r"(fix|implement|work\s+on|debug|code|build|test|deploy)",
+                        # SMART FILE MODIFICATION PATTERNS
+                        r"(change|modify|update|edit|replace)\s+.*\s+(in|from)\s+\w+\.(\w+)",
+                        r"(change|update|modify)\s+.*\s+(text|content|code)\s+in\s+\w+",
+                        r"replace\s+.*\s+(with|to)\s+.*\s+in\s+\w+",
+                        r"(add|insert|include)\s+.*\s+(to|in)\s+\w+\.(\w+)",
+                        r"(remove|delete)\s+.*\s+(from|in)\s+\w+\.(\w+)",
+                        r"(refactor|restructure|reorganize)\s+.*\s+in\s+\w+",
+                        r"(create|add)\s+.*\s+(function|class|method|component)\s+in\s+\w+",
+                        r"(fix|debug|solve)\s+.*\s+(bug|issue|error)\s+in\s+\w+",
                     ],
                     "confidence": 0.9
                 },
@@ -86,6 +95,21 @@ class IntentRouter:
                         r"process.*all.*pending",
                     ],
                     "confidence": 0.9
+                }
+            ],
+            "run-all": [
+                {
+                    "patterns": [
+                        r"\b(run|start|execute)\s+all\b",
+                        r"\b(do|work\s+on)\s+everything\b",
+                        r"\b(run|start)\s+(all\s+)?(todos|tasks)\b",
+                        r"\b(execute|process)\s+(all|everything)\b",
+                        r"\ball\s+(todos|tasks)\s+(now|start)\b",
+                        r"\bmultitask\s+all\b",
+                        r"\brun\s+all\s+(pending|active)\b",
+                        r"\bstart\s+working\s+on\s+everything\b",
+                    ],
+                    "confidence": 0.95
                 }
             ],
             "create-github-issue": [
@@ -318,9 +342,17 @@ class IntentRouter:
                 "📏 I'll help you organize that task better!",
             ],
             "multitask": [
-                "⚡ Ready to power through multiple tasks!",
-                "🔥 Let's tackle everything at once!",
-                "🚀 Time for some parallel processing magic!",
+                "🚀 Time to get productive! Let's multitask!",
+                "⚡ Ready to tackle multiple todos at once!",
+                "🎯 Multitasking mode activated - let's do this!",
+                "💪 Time to show those todos who's boss!",
+            ],
+            "run-all": [
+                "🔥 ALL SYSTEMS GO! Running everything at once!",
+                "⚡ FULL POWER MODE! Let's crush all your todos!",
+                "🚀 MAXIMUM PRODUCTIVITY! Processing all tasks now!",
+                "💥 BEAST MODE ACTIVATED! All todos starting now!",
+                "🎯 THE ULTIMATE SHORTCUT! Everything runs now!",
             ],
             "github-issues": [
                 "🐙 Let's check what's happening on GitHub!",

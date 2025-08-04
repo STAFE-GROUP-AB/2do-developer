@@ -34,6 +34,7 @@ from .browser_integration import BrowserIntegration
 from .image_handler import ImageHandler
 from .intent_router import IntentRouter
 from .permission_manager import PermissionManager, diagnose_permissions
+from .automation_engine import AutomationEngine
 
 from .setup_guide import SetupGuide
 from .mcp_manager import MCPServerManager
@@ -263,6 +264,10 @@ def start(repo, force_analyze):
     image_handler = ImageHandler()
     intent_router = IntentRouter()
     
+    # Initialize the automation engine with smart todo parsing and GitHub Pro mode
+    automation_engine = AutomationEngine(todo_manager, multitasker, github_integration)
+    console.print("🤖 Smart automation engine initialized!")
+    
     # Get repository info if we're in a git repo
     repo_info = None
     if config_manager.is_local_project:
@@ -350,7 +355,11 @@ def start(repo, force_analyze):
                 browser_integration.stop_browser_mode()
             break
         elif action == "add-todo":
-            handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params)
+            # Try smart todo parsing first
+            smart_todo_handled = asyncio.run(automation_engine.handle_smart_todo_creation(user_input))
+            if not smart_todo_handled:
+                # Fallback to traditional todo creation
+                handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params)
         elif action == "list-todos":
             handle_list_todos(todo_manager)
         elif action == "remove-todo":
@@ -361,6 +370,9 @@ def start(repo, force_analyze):
             handle_create_subtasks(todo_manager, ai_router)
         elif action == "multitask":
             handle_multitask(multitasker, todo_manager, browser_integration)
+        elif action == "run-all":
+            # The ultimate shortcut - run all todos at once!
+            asyncio.run(automation_engine.run_all_todos())
         elif action == "parse-markdown":
             handle_parse_markdown(todo_manager, working_dir)
         elif action == "mcp-management":
@@ -1260,6 +1272,19 @@ def show_natural_language_help():
     console.print("   • 'Delete completed todos'")
     console.print("   • 'Clean up finished tasks'")
     
+    console.print("\n🤖 [bold]SMART TODO AUTOMATION:[/bold]")
+    console.print("   • 'Change the text in readme.md from Hello to Hi'")
+    console.print("   • 'Add a new function called validateUser to auth.js'")
+    console.print("   • 'Fix the bug in payment.py line 42'")
+    console.print("   • 'Replace the old API call with the new one in app.js'")
+    console.print("   • 'Remove the deprecated function from utils.py'")
+    console.print("   • 'Refactor the database connection in config.py'")
+    
+    console.print("\n🚀 [bold]ULTIMATE SHORTCUTS:[/bold]")
+    console.print("   • 'run all' - Start multitasking on ALL pending todos")
+    console.print("   • 'execute everything' - Maximum productivity mode")
+    console.print("   • 'start all todos' - The ultimate automation shortcut")
+    
     console.print("\n🐙 [bold]GitHub Integration:[/bold]")
     console.print("   • 'Show me GitHub issues'")
     console.print("   • 'Create a GitHub issue for the API bug'")
@@ -1667,6 +1692,156 @@ def _display_ai_models(ai_router, config_manager, show_free, show_configured):
     if not show_configured:
         console.print(f"\n💡 Models marked '⚠️  Available' need provider implementation")
         console.print(f"💡 Use [bold]2do add-ai --list-supported[/bold] to see all supported models")
+
+@cli.command()
+def github_pro():
+    """Toggle GitHub Pro mode for advanced automation"""
+    console.print(Panel.fit("🚀 GitHub Pro Mode Management", style="bold blue"))
+    
+    try:
+        # Determine working directory
+        working_dir = _get_safe_working_directory()
+        
+        # Initialize managers
+        config_manager = ConfigManager(working_dir)
+        if not config_manager.has_api_keys():
+            console.print("❌ No API keys configured. Please run '2do setup' first.")
+            return
+        
+        github_integration = GitHubIntegration(config_manager.get_api_key("github"))
+        todo_manager = TodoManager(config_manager.config_dir)
+        ai_router = AIRouter(config_manager)
+        multitasker = Multitasker(ai_router, todo_manager)
+        
+        # Initialize automation engine
+        automation_engine = AutomationEngine(todo_manager, multitasker, github_integration)
+        
+        # Toggle GitHub Pro mode
+        new_status = automation_engine.toggle_github_pro_mode()
+        
+        if new_status:
+            console.print("\n🎯 GitHub Pro Mode Features:")
+            console.print("  • Each todo gets its own branch")
+            console.print("  • Automatic branch creation and switching")
+            console.print("  • Auto-push when todo completes")
+            console.print("  • Automatic PR creation per todo")
+            console.print("  • Advanced GitHub workflow integration")
+        
+    except Exception as e:
+        console.print(f"❌ Error managing GitHub Pro mode: {e}")
+
+@cli.command()
+def run_all():
+    """Run multitasking on all pending todos - the ultimate shortcut"""
+    console.print(Panel.fit("🔥 RUN ALL MODE", style="bold red"))
+    
+    try:
+        # Determine working directory
+        working_dir = _get_safe_working_directory()
+        
+        # Initialize managers
+        config_manager = ConfigManager(working_dir)
+        if not config_manager.has_api_keys():
+            console.print("❌ No API keys configured. Please run '2do setup' first.")
+            return
+        
+        github_integration = GitHubIntegration(config_manager.get_api_key("github"))
+        todo_manager = TodoManager(config_manager.config_dir)
+        ai_router = AIRouter(config_manager)
+        multitasker = Multitasker(ai_router, todo_manager)
+        
+        # Initialize automation engine
+        automation_engine = AutomationEngine(todo_manager, multitasker, github_integration)
+        
+        # Run all todos
+        asyncio.run(automation_engine.run_all_todos())
+        
+    except Exception as e:
+        console.print(f"❌ Error in run all mode: {e}")
+
+@cli.command()
+@click.argument('request', required=False)
+def smart_todo(request):
+    """Create a smart todo from natural language (e.g., 'change text in readme.md')"""
+    console.print(Panel.fit("🤖 Smart Todo Creation", style="bold green"))
+    
+    if not request:
+        request = Prompt.ask("What would you like to do?", default="")
+    
+    if not request.strip():
+        console.print("❌ Please provide a request.")
+        return
+    
+    try:
+        # Determine working directory
+        working_dir = _get_safe_working_directory()
+        
+        # Initialize managers
+        config_manager = ConfigManager(working_dir)
+        if not config_manager.has_api_keys():
+            console.print("❌ No API keys configured. Please run '2do setup' first.")
+            return
+        
+        github_integration = GitHubIntegration(config_manager.get_api_key("github"))
+        todo_manager = TodoManager(config_manager.config_dir)
+        ai_router = AIRouter(config_manager)
+        multitasker = Multitasker(ai_router, todo_manager)
+        
+        # Initialize automation engine
+        automation_engine = AutomationEngine(todo_manager, multitasker, github_integration)
+        
+        # Handle smart todo creation
+        asyncio.run(automation_engine.handle_smart_todo_creation(request))
+        
+    except Exception as e:
+        console.print(f"❌ Error creating smart todo: {e}")
+
+@cli.command()
+def automation_status():
+    """Show current automation engine status and features"""
+    console.print(Panel.fit("🤖 Automation Engine Status", style="bold cyan"))
+    
+    try:
+        # Determine working directory
+        working_dir = _get_safe_working_directory()
+        
+        # Initialize managers
+        config_manager = ConfigManager(working_dir)
+        github_integration = GitHubIntegration(config_manager.get_api_key("github")) if config_manager.has_api_keys() else None
+        todo_manager = TodoManager(config_manager.config_dir)
+        ai_router = AIRouter(config_manager) if config_manager.has_api_keys() else None
+        multitasker = Multitasker(ai_router, todo_manager) if ai_router else None
+        
+        # Initialize automation engine
+        automation_engine = AutomationEngine(todo_manager, multitasker, github_integration)
+        
+        # Get status
+        status = automation_engine.get_automation_status()
+        
+        console.print("\n🎯 Automation Features:")
+        console.print(f"  • Smart Todo Parsing: {'✅ Enabled' if status['smart_parsing_enabled'] else '❌ Disabled'}")
+        console.print(f"  • Instant Action Prompts: {'✅ Enabled' if status['instant_actions_enabled'] else '❌ Disabled'}")
+        console.print(f"  • Run All Shortcut: {'✅ Available' if status['run_all_available'] else '❌ Unavailable'}")
+        console.print(f"  • GitHub Pro Mode: {'🚀 Active' if status['github_pro_mode'] else '📴 Inactive'}")
+        console.print(f"  • GitHub Integration: {'✅ Connected' if status['github_integration'] else '❌ Not configured'}")
+        
+        console.print("\n🔧 Available Commands:")
+        console.print("  • [bold]2do smart-todo[/bold] - Create smart todos from natural language")
+        console.print("  • [bold]2do run-all[/bold] - Run multitasking on all pending todos")
+        console.print("  • [bold]2do github-pro[/bold] - Toggle GitHub Pro mode")
+        console.print("  • [bold]2do automation-status[/bold] - Show this status")
+        
+        # Show current todos
+        todos = todo_manager.get_todos()
+        pending_todos = [todo for todo in todos if todo.status == 'pending']
+        
+        console.print(f"\n📊 Current Status:")
+        console.print(f"  • Total todos: {len(todos)}")
+        console.print(f"  • Pending todos: {len(pending_todos)}")
+        console.print(f"  • Ready for 'run all': {'✅ Yes' if pending_todos else '❌ No pending todos'}")
+        
+    except Exception as e:
+        console.print(f"❌ Error getting automation status: {e}")
 
 
 def main():
