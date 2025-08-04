@@ -81,6 +81,9 @@ class IntentRouter:
                         r"(process|work\s+on)\s+(all|multiple)\s+(todos|tasks)",
                         r"(batch|bulk)\s+(process|execute|run)",
                         r"(do|execute|run)\s+(everything|all\s+todos|all\s+tasks)",
+                        r"multitask\s+on\s+(all|my|pending)",
+                        r"run.*multitask",
+                        r"process.*all.*pending",
                     ],
                     "confidence": 0.9
                 }
@@ -195,6 +198,12 @@ class IntentRouter:
                         if len(re.findall(pattern, user_input_lower)) > 1:
                             confidence += 0.05
                         
+                        # Special boost for specific keywords
+                        if intent_name == "multitask" and "multitask" in user_input_lower:
+                            confidence += 0.1
+                        elif intent_name == "create-github-issue" and "create" in user_input_lower and "github" in user_input_lower:
+                            confidence += 0.05
+                        
                         # Extract potential parameters (like todo titles, issue numbers, etc.)
                         extracted_params = self._extract_parameters(user_input, intent_name, pattern)
                         
@@ -208,8 +217,8 @@ class IntentRouter:
             # If no specific pattern matched, determine based on general keywords
             return self._fallback_intent_detection(user_input_lower)
         
-        # Return the match with highest confidence
-        best_match = max(matches, key=lambda x: x.confidence)
+        # Return the match with highest confidence, with tie-breaking by specificity
+        best_match = max(matches, key=lambda x: (x.confidence, len(x.intent)))
         return best_match
     
     def _extract_parameters(self, user_input: str, intent: str, pattern: str) -> Dict:
