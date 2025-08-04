@@ -50,6 +50,14 @@ class TechStackDetector:
             "alpinejs": ["package.json"] # Special case, checked in content
         }
     
+    def _is_restricted_directory(self, dir_name: str) -> bool:
+        """Check if directory should be skipped during analysis"""
+        restricted_dirs = {
+            'vendor', 'node_modules', '.git', '__pycache__', '.pytest_cache',
+            'venv', 'env', '.venv', '.env', 'build', 'dist', 'target'
+        }
+        return dir_name.lower() in restricted_dirs or dir_name.startswith('.')
+    
     def analyze_repo(self, repo_path: str, force_reanalyze: bool = False) -> List[str]:
         """Analyze repository to detect technology stack"""
         repo_path = Path(repo_path)
@@ -62,8 +70,8 @@ class TechStackDetector:
         
         # Walk through repository files
         for root, dirs, files in os.walk(repo_path):
-            # Skip hidden directories and common ignore patterns
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__', 'venv', 'env']]
+            # Skip restricted directories (vendor, node_modules, etc.)
+            dirs[:] = [d for d in dirs if not self._is_restricted_directory(d)]
             
             for file in files:
                 file_path = Path(root) / file

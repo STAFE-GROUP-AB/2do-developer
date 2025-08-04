@@ -102,10 +102,47 @@ class MCPClient:
             }
         ]
     
+    def _is_restricted_path(self, file_path: str) -> bool:
+        """Check if path is in restricted directories (vendor, node_modules)"""
+        path_parts = Path(file_path).parts
+        file_name = Path(file_path).name.lower()
+        restricted_dirs = {'vendor', 'node_modules', '.git', '__pycache__', '.pytest_cache'}
+        
+        # Allow package manifest files for dependency detection
+        allowed_manifest_files = {
+            'composer.json', 'package.json', 'requirements.txt', 
+            'pyproject.toml', 'pom.xml', 'build.gradle', 'cargo.toml'
+        }
+        
+        # If it's a manifest file, allow it even in restricted directories
+        if file_name in allowed_manifest_files:
+            return False
+        
+        # Check if any part of the path is a restricted directory
+        for part in path_parts:
+            if part.lower() in restricted_dirs:
+                return True
+        return False
+    
+    def _validate_file_operation(self, file_path: str, operation: str) -> None:
+        """Validate that file operation is allowed on this path"""
+        if self._is_restricted_path(file_path):
+            restricted_msg = (
+                f"❌ RESTRICTED: {operation} operation blocked on '{file_path}'. "
+                f"Access to vendor/, node_modules/, .git/, and cache directories is prohibited "
+                f"for security and performance reasons. Only package manifest files "
+                f"(composer.json, package.json) can be read for dependency detection."
+            )
+            raise PermissionError(restricted_msg)
+    
     async def call_filesystem_tool(self, tool_name: str, parameters: Dict[str, Any]) -> str:
         """Call a filesystem tool through the MCP server"""
         if not self.filesystem_server:
             raise RuntimeError("Filesystem MCP server not initialized")
+        
+        # Validate path for all operations
+        file_path = parameters.get("path", "")
+        self._validate_file_operation(file_path, tool_name)
         
         try:
             if tool_name == "read_file":

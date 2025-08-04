@@ -110,6 +110,17 @@ class MarkdownTaskParser:
                 return True
         return False
     
+    def _is_restricted_path(self, file_path: Path) -> bool:
+        """Check if path is in restricted directories (vendor, node_modules, etc.)"""
+        path_parts = [part.lower() for part in file_path.parts]
+        restricted_dirs = {'vendor', 'node_modules', '.git', '__pycache__', '.pytest_cache'}
+        
+        # Check if any part of the path is a restricted directory
+        for part in path_parts:
+            if part in restricted_dirs:
+                return True
+        return False
+    
     def parse_directory(self, directory_path: str) -> List[Dict]:
         """Parse all markdown files in a directory"""
         directory_path = Path(directory_path)
@@ -121,13 +132,17 @@ class MarkdownTaskParser:
         all_tasks = []
         markdown_files = list(directory_path.rglob("*.md")) + list(directory_path.rglob("*.markdown"))
         
-        console.print(f"📄 Found {len(markdown_files)} markdown files")
-        
+        # Filter out files in restricted directories
+        filtered_files = []
         for md_file in markdown_files:
-            # Skip hidden files and common ignore patterns
+            if not self._is_restricted_path(md_file):
+                filtered_files.append(md_file)
+        
+        console.print(f"📄 Found {len(filtered_files)} markdown files (filtered {len(markdown_files) - len(filtered_files)} from restricted directories)")
+        
+        for md_file in filtered_files:
+            # Skip hidden files
             if any(part.startswith('.') for part in md_file.parts):
-                continue
-            if any(ignore in str(md_file) for ignore in ['node_modules', '__pycache__', '.git']):
                 continue
                 
             console.print(f"📄 Parsing: {md_file.relative_to(directory_path)}")
