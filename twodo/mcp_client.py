@@ -23,8 +23,14 @@ class MCPClient:
     async def initialize_filesystem_server(self, project_path: str = None):
         """Initialize the filesystem MCP server for file operations"""
         try:
-            # Use project path or current directory
-            base_path = project_path or str(Path.cwd())
+            # CRITICAL FIX: Always use the explicitly passed project_path first
+            # This ensures we operate in the user's working directory, not the 2do source directory
+            if project_path:
+                base_path = str(Path(project_path).resolve())
+                console.print(f"🎯 Using explicit project path: {base_path}")
+            else:
+                base_path = str(Path.cwd().resolve())
+                console.print(f"🎯 Using current working directory: {base_path}")
             
             # Start the filesystem MCP server
             cmd = [
