@@ -61,9 +61,12 @@
 - Automatic todo creation from parsed tasks
 
 ### 🔌 MCP Server Integration
-- Built-in support for MCP (Model Context Protocol) servers
-- Extensible architecture for adding custom integrations
-- Enhanced context and capabilities for AI models
+- **🎯 Smart MCP Server Recommendations**: Automatically analyzes your codebase and recommends the most relevant MCP servers
+- **📋 Tech Stack-Based Selection**: Suggests MCP servers based on detected technologies (Python, JavaScript, Docker, etc.)
+- **⭐ Always-Included Essentials**: Ensures [Context7 (Upstash)](https://github.com/upstash/context7) and filesystem servers are always available
+- **🔧 Easy Configuration**: Interactive setup and management of MCP servers through `2do mcp` command
+- **🛠️ Popular Server Support**: Includes Git, GitHub, Python, Node.js, Browser, Docker, AWS, and database MCP servers
+- **💾 Persistent Configuration**: Saves MCP server configurations for reuse across sessions
 
 ## Installation
 
@@ -205,6 +208,30 @@ cd /path/to/your/web/project
 #    - Switches to that branch for development
 # 4. Make your changes and commits
 # 5. Choose "finish-work" to create a pull request
+```
+
+### MCP Server Management
+```bash
+# Get recommendations based on your project
+2do mcp --recommend
+
+# Set up MCP servers interactively (analyzes codebase and recommends servers)
+2do mcp
+
+# List currently configured MCP servers
+2do mcp --list
+
+# Example output for a Python project:
+# 🔍 Analyzing project: /path/to/project
+# 📋 Detected technologies: python, git
+# 
+# Recommended MCP Servers:
+# ✅ Context7 (Upstash) - Always included for advanced context management
+# ✅ Filesystem MCP Server - Essential for file operations
+# ✅ Git MCP Server - Git repository operations (detected: git)
+# ✅ Python MCP Server - Python code execution (detected: python)
+#
+# Interactive selection allows you to choose which servers to configure
 ```
 
 ### Markdown Task Processing
