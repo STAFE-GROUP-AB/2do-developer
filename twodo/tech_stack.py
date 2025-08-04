@@ -198,6 +198,131 @@ class TechStackDetector:
         except Exception as e:
             console.print(f"⚠️  Could not analyze composer.json: {e}")
     
+    def analyze_tall_stack_completeness(self, repo_path: str) -> Dict:
+        """Analyze how complete the TALL stack implementation is"""
+        repo_path = Path(repo_path)
+        tall_analysis = {
+            "is_tall_stack": False,
+            "components": {
+                "tailwindcss": False,
+                "alpinejs": False,
+                "laravel": False,
+                "livewire": False
+            },
+            "completeness_score": 0,
+            "recommendations": [],
+            "detected_files": {
+                "tailwindcss": [],
+                "alpinejs": [],
+                "laravel": [],
+                "livewire": []
+            }
+        }
+        
+        if not repo_path.exists():
+            return tall_analysis
+        
+        # Check for TailwindCSS
+        tailwind_indicators = [
+            "tailwind.config.js", "tailwind.config.ts",
+            "webpack.mix.js", "vite.config.js"
+        ]
+        for indicator in tailwind_indicators:
+            if (repo_path / indicator).exists():
+                tall_analysis["components"]["tailwindcss"] = True
+                tall_analysis["detected_files"]["tailwindcss"].append(indicator)
+                break
+        
+        # Check package.json for Tailwind
+        package_json = repo_path / "package.json"
+        if package_json.exists():
+            try:
+                with open(package_json, 'r') as f:
+                    package_data = json.load(f)
+                dependencies = {**package_data.get('dependencies', {}), **package_data.get('devDependencies', {})}
+                
+                if 'tailwindcss' in dependencies:
+                    tall_analysis["components"]["tailwindcss"] = True
+                    tall_analysis["detected_files"]["tailwindcss"].append("package.json")
+                
+                if 'alpinejs' in dependencies or '@alpinejs/collapse' in dependencies:
+                    tall_analysis["components"]["alpinejs"] = True
+                    tall_analysis["detected_files"]["alpinejs"].append("package.json")
+            except Exception:
+                pass
+        
+        # Check for Laravel
+        laravel_indicators = ["artisan", "app/Http/Kernel.php", "config/app.php"]
+        for indicator in laravel_indicators:
+            if (repo_path / indicator).exists():
+                tall_analysis["components"]["laravel"] = True
+                tall_analysis["detected_files"]["laravel"].append(indicator)
+                break
+        
+        # Check composer.json for Laravel/Livewire
+        composer_json = repo_path / "composer.json"
+        if composer_json.exists():
+            try:
+                with open(composer_json, 'r') as f:
+                    composer_data = json.load(f)
+                dependencies = {**composer_data.get('require', {}), **composer_data.get('require-dev', {})}
+                
+                if 'laravel/framework' in dependencies:
+                    tall_analysis["components"]["laravel"] = True
+                    tall_analysis["detected_files"]["laravel"].append("composer.json")
+                
+                if 'livewire/livewire' in dependencies:
+                    tall_analysis["components"]["livewire"] = True
+                    tall_analysis["detected_files"]["livewire"].append("composer.json")
+            except Exception:
+                pass
+        
+        # Check for Livewire components
+        livewire_dirs = [
+            repo_path / "app" / "Http" / "Livewire",
+            repo_path / "app" / "Livewire"
+        ]
+        for livewire_dir in livewire_dirs:
+            if livewire_dir.exists() and any(livewire_dir.iterdir()):
+                tall_analysis["components"]["livewire"] = True
+                tall_analysis["detected_files"]["livewire"].append(str(livewire_dir.relative_to(repo_path)))
+                break
+        
+        # Check for Alpine.js in Blade templates
+        blade_files = list(repo_path.rglob("*.blade.php"))
+        alpine_patterns = ["x-data", "x-show", "x-if", "@click", "x-model"]
+        
+        for blade_file in blade_files[:10]:  # Check first 10 blade files
+            try:
+                with open(blade_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    if any(pattern in content for pattern in alpine_patterns):
+                        tall_analysis["components"]["alpinejs"] = True
+                        tall_analysis["detected_files"]["alpinejs"].append(str(blade_file.relative_to(repo_path)))
+                        break
+            except Exception:
+                continue
+        
+        # Calculate completeness
+        component_count = sum(tall_analysis["components"].values())
+        tall_analysis["completeness_score"] = (component_count / 4) * 100
+        tall_analysis["is_tall_stack"] = component_count >= 3  # At least 3 components
+        
+        # Generate recommendations
+        if not tall_analysis["components"]["tailwindcss"]:
+            tall_analysis["recommendations"].append("Install TailwindCSS for utility-first styling")
+        if not tall_analysis["components"]["alpinejs"]:
+            tall_analysis["recommendations"].append("Add Alpine.js for reactive frontend components")
+        if not tall_analysis["components"]["laravel"]:
+            tall_analysis["recommendations"].append("This doesn't appear to be a Laravel project")
+        if not tall_analysis["components"]["livewire"]:
+            tall_analysis["recommendations"].append("Install Livewire for dynamic Laravel components")
+        
+        if tall_analysis["is_tall_stack"]:
+            tall_analysis["recommendations"].append("Consider using TALL-stack specific AI models for better assistance")
+        
+        return tall_analysis
+    
     def create_memory_files(self, tech_stack: List[str]):
         """Create memory files for detected technologies"""
         console.print("💾 Creating memory files for tech stack...")

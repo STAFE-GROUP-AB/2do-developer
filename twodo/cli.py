@@ -40,6 +40,8 @@ from .automation_engine import AutomationEngine
 from .setup_guide import SetupGuide
 from .mcp_manager import MCPServerManager
 from .updater import UpdateManager
+from .smart_code_analyzer import SmartCodeAnalyzer
+from .automation_engine import EnhancedAutomationEngine
 from .scheduler import Scheduler
 
 
@@ -1865,6 +1867,574 @@ def automation_status():
 
 
 @cli.command()
+@click.option('--project', '-p', help='Project path to analyze (default: current directory)')
+@click.option('--file', '-f', help='Specific file to analyze')
+@click.option('--max-files', default=50, help='Maximum number of files to analyze')
+def smart_analyze(project, file, max_files):
+    """Smart code analysis for enhanced development intelligence"""
+    console.print(Panel.fit("🧠 Smart Code Analysis", style="bold blue"))
+    
+    try:
+        analyzer = SmartCodeAnalyzer()
+        
+        if file:
+            # Analyze single file
+            console.print(f"📄 Analyzing file: {file}")
+            analysis = analyzer.analyze_file(file)
+            
+            if not analysis:
+                console.print("❌ Could not analyze file (unsupported format or file not found)")
+                return
+            
+            # Display file analysis
+            _display_file_analysis(analysis)
+            
+        else:
+            # Analyze project
+            project_path = project or os.getcwd()
+            console.print(f"📁 Analyzing project: {project_path}")
+            
+            project_analysis = analyzer.analyze_project(project_path, max_files)
+            
+            if not project_analysis.file_analyses:
+                console.print("❌ No code files found to analyze")
+                return
+            
+            # Display project analysis
+            _display_project_analysis(project_analysis)
+            
+            # Show intelligent suggestions
+            suggestions = analyzer.get_intelligent_suggestions(project_analysis)
+            if suggestions:
+                console.print("\n💡 Intelligent Development Suggestions:")
+                for i, suggestion in enumerate(suggestions, 1):
+                    console.print(f"   {i}. {suggestion}")
+            
+    except Exception as e:
+        console.print(f"❌ Error during analysis: {e}")
+
+@cli.command()
+@click.option('--project', '-p', help='Project path (default: current directory)')
+def smart_todo(project):
+    """Create intelligent todos based on code analysis"""
+    console.print(Panel.fit("🎯 Smart Todo Generation", style="bold green"))
+    
+    try:
+        project_path = project or os.getcwd()
+        analyzer = SmartCodeAnalyzer()
+        
+        # Analyze project
+        console.print(f"🔍 Analyzing project for todo opportunities: {project_path}")
+        project_analysis = analyzer.analyze_project(project_path, 30)
+        
+        if not project_analysis.file_analyses:
+            console.print("❌ No code files found to analyze")
+            return
+        
+        # Generate smart todos
+        smart_todos = _generate_smart_todos(project_analysis)
+        
+        if not smart_todos:
+            console.print("✅ No immediate development tasks identified!")
+            return
+        
+        console.print(f"\n📋 Generated {len(smart_todos)} smart development todos:")
+        
+        # Initialize todo manager
+        config_manager = ConfigManager()
+        todo_manager = TodoManager(config_manager.config_dir)
+        
+        for i, todo_data in enumerate(smart_todos, 1):
+            console.print(f"   {i}. {todo_data['content'][:80]}...")
+            
+            if Confirm.ask(f"Create this todo?", default=True):
+                todo_id = todo_manager.add_todo(
+                    content=todo_data['content'],
+                    todo_type="code",
+                    priority=todo_data['priority']
+                )
+                console.print(f"      ✅ Created todo #{todo_id}")
+        
+        console.print(f"\n🎉 Smart todo generation complete!")
+        
+    except Exception as e:
+        console.print(f"❌ Error generating smart todos: {e}")
+
+@cli.command()
+@click.option('--project', '-p', help='Project path (default: current directory)')
+def tall_stack_check(project):
+    """Analyze TALL stack completeness and provide recommendations"""
+    console.print(Panel.fit("🏗️ TALL Stack Analysis", style="bold yellow"))
+    
+    try:
+        project_path = project or os.getcwd()
+        
+        # Initialize tech stack detector
+        config_manager = ConfigManager()
+        tech_detector = TechStackDetector(config_manager.config_dir)
+        
+        # Analyze TALL stack completeness
+        tall_analysis = tech_detector.analyze_tall_stack_completeness(project_path)
+        
+        # Display results
+        console.print(f"\n📊 TALL Stack Analysis for: {project_path}")
+        console.print(f"Completeness Score: {tall_analysis['completeness_score']:.0f}%")
+        console.print(f"Is TALL Stack: {'✅ Yes' if tall_analysis['is_tall_stack'] else '❌ No'}")
+        
+        # Show components
+        console.print("\n🔧 TALL Stack Components:")
+        components = tall_analysis['components']
+        
+        tailwind_status = "✅" if components['tailwindcss'] else "❌"
+        alpine_status = "✅" if components['alpinejs'] else "❌"
+        laravel_status = "✅" if components['laravel'] else "❌"
+        livewire_status = "✅" if components['livewire'] else "❌"
+        
+        console.print(f"   {tailwind_status} TailwindCSS - Utility-first CSS framework")
+        console.print(f"   {alpine_status} Alpine.js - Minimal reactive framework")
+        console.print(f"   {laravel_status} Laravel - PHP web application framework")
+        console.print(f"   {livewire_status} Livewire - Dynamic Laravel components")
+        
+        # Show detected files
+        if any(tall_analysis['detected_files'].values()):
+            console.print("\n📄 Detected Files:")
+            for component, files in tall_analysis['detected_files'].items():
+                if files:
+                    console.print(f"   {component.capitalize()}: {', '.join(files[:3])}")
+        
+        # Show recommendations
+        if tall_analysis['recommendations']:
+            console.print("\n💡 Recommendations:")
+            for i, rec in enumerate(tall_analysis['recommendations'], 1):
+                console.print(f"   {i}. {rec}")
+        
+        # Suggest MCP servers based on analysis
+        if tall_analysis['is_tall_stack']:
+            console.print("\n🔌 Recommended MCP Servers for TALL Stack:")
+            console.print("   • Context7 (Upstash) - Advanced context management")
+            console.print("   • PHP MCP Server - PHP code execution")
+            console.print("   • Git MCP Server - Version control operations")
+            console.print("   • GitHub MCP Server - Repository integration")
+            console.print("\n💡 Run '2do mcp' to configure these servers")
+        
+    except Exception as e:
+        console.print(f"❌ Error analyzing TALL stack: {e}")
+
+def _display_file_analysis(analysis):
+    """Display analysis results for a single file"""
+    console.print(f"\n📄 File: {analysis.file_path}")
+    console.print(f"Language: {analysis.language}")
+    console.print(f"Complexity Score: {analysis.complexity_score}")
+    
+    if analysis.functions:
+        console.print(f"Functions: {len(analysis.functions)}")
+        for func in analysis.functions[:5]:  # Show first 5
+            console.print(f"   • {func['name']} (line {func.get('line', 'unknown')})")
+    
+    if analysis.classes:
+        console.print(f"Classes: {len(analysis.classes)}")
+        for cls in analysis.classes[:5]:  # Show first 5
+            console.print(f"   • {cls['name']} (line {cls.get('line', 'unknown')})")
+    
+    if analysis.tech_stack_hints:
+        console.print(f"Tech Stack Hints: {', '.join(analysis.tech_stack_hints)}")
+    
+    if analysis.suggestions:
+        console.print("Suggestions:")
+        for sugg in analysis.suggestions:
+            console.print(f"   • {sugg}")
+
+def _display_project_analysis(analysis):
+    """Display analysis results for an entire project"""
+    console.print(f"\n📁 Project: {analysis.project_path}")
+    console.print(f"Files Analyzed: {len(analysis.file_analyses)}")
+    console.print(f"Overall Complexity: {analysis.overall_complexity}")
+    
+    if analysis.tech_stack:
+        console.print(f"Detected Technologies: {', '.join(analysis.tech_stack)}")
+    
+    if analysis.architecture_patterns:
+        console.print(f"Architecture Patterns: {', '.join(analysis.architecture_patterns)}")
+    
+    # Show file breakdown by language
+    languages = {}
+    for file_analysis in analysis.file_analyses:
+        lang = file_analysis.language
+        languages[lang] = languages.get(lang, 0) + 1
+    
+    if languages:
+        console.print("File Types:")
+        for lang, count in languages.items():
+            console.print(f"   • {lang}: {count} files")
+    
+    if analysis.recommendations:
+        console.print("Project Recommendations:")
+        for rec in analysis.recommendations:
+            console.print(f"   • {rec}")
+
+def _generate_smart_todos(project_analysis):
+    """Generate intelligent todos based on project analysis"""
+    todos = []
+    
+    # High complexity files need refactoring
+    for file_analysis in project_analysis.file_analyses:
+        if file_analysis.complexity_score > 30:
+            todos.append({
+                'content': f"Refactor high-complexity file: {Path(file_analysis.file_path).name} (complexity: {file_analysis.complexity_score})",
+                'priority': 'high',
+                'type': 'code'
+            })
+    
+    # Missing TALL stack components
+    tech_stack = set(project_analysis.tech_stack)
+    if 'laravel' in tech_stack:
+        if 'livewire' not in tech_stack:
+            todos.append({
+                'content': "Consider adding Livewire for reactive PHP components without complex JavaScript",
+                'priority': 'medium',
+                'type': 'code'
+            })
+        
+        if 'tailwind' not in tech_stack:
+            todos.append({
+                'content': "Add TailwindCSS for utility-first styling approach",
+                'priority': 'medium',
+                'type': 'code'
+            })
+        
+        if 'alpine' not in tech_stack:
+            todos.append({
+                'content': "Add Alpine.js for lightweight reactive frontend components",
+                'priority': 'low',
+                'type': 'code'
+            })
+    
+    # Large functions/classes need attention
+    for file_analysis in project_analysis.file_analyses:
+        large_functions = [f for f in file_analysis.functions if f.get('complexity', 0) > 10]
+        if large_functions:
+            for func in large_functions[:2]:  # Limit to 2 per file
+                todos.append({
+                    'content': f"Refactor complex function: {func['name']} in {Path(file_analysis.file_path).name}",
+                    'priority': 'medium',
+                    'type': 'code'
+                })
+    
+    # Add testing suggestions
+    if not any('test' in fa.file_path.lower() for fa in project_analysis.file_analyses):
+        todos.append({
+            'content': "Add unit tests for better code quality and maintainability",
+            'priority': 'high',
+            'type': 'code'
+        })
+    
+    # Documentation suggestions
+    if project_analysis.overall_complexity == 'high' and len(project_analysis.file_analyses) > 10:
+        todos.append({
+            'content': "Create comprehensive project documentation due to high complexity",
+            'priority': 'medium',
+            'type': 'text'
+        })
+    
+    return todos[:10]  # Limit to 10 todos
+
+@cli.command()
+@click.option('--project', '-p', help='Project path (default: current directory)')
+@click.option('--type', 'scaffold_type', help='Scaffold type: livewire, controller, model, crud')
+@click.argument('name', required=False)
+def scaffold(project, scaffold_type, name):
+    """Intelligent TALL Stack scaffolding and code generation"""
+    console.print(Panel.fit("🏗️ TALL Stack Scaffolding", style="bold blue"))
+    
+    try:
+        project_path = project or os.getcwd()
+        
+        # Initialize components
+        config_manager = ConfigManager()
+        todo_manager = TodoManager(config_manager.config_dir)
+        tech_detector = TechStackDetector(config_manager.config_dir)
+        automation_engine = EnhancedAutomationEngine(todo_manager, None, None, tech_detector)
+        
+        # If no name provided, ask for user input
+        if not name:
+            user_input = Prompt.ask("What would you like to scaffold? (e.g., 'create Livewire component UserProfile')")
+            
+            # Try to detect scaffolding from natural language
+            scaffold_info = automation_engine.detect_scaffolding_opportunity(user_input, project_path)
+            
+            if scaffold_info:
+                console.print(f"🎯 Detected request: {scaffold_info['scaffold_info'].description}")
+                console.print(f"📝 Component name: {scaffold_info['name']}")
+                
+                if Confirm.ask("Proceed with scaffolding?", default=True):
+                    success = automation_engine.execute_scaffolding(scaffold_info, project_path)
+                    if success:
+                        console.print("✅ Scaffolding completed successfully!")
+                    else:
+                        console.print("❌ Scaffolding failed!")
+                return
+            else:
+                console.print("❌ Could not understand scaffolding request. Try being more specific.")
+                return
+        
+        # Handle specific scaffold type and name
+        if scaffold_type and name:
+            # Map common scaffold types
+            scaffold_map = {
+                'livewire': 'laravel_livewire_component',
+                'component': 'laravel_livewire_component',
+                'controller': 'laravel_controller',
+                'model': 'laravel_model',
+                'crud': 'full_tall_crud'
+            }
+            
+            template_key = scaffold_map.get(scaffold_type.lower())
+            if template_key and template_key in automation_engine.scaffold_templates:
+                scaffold_info = {
+                    'template': template_key,
+                    'name': name.capitalize(),
+                    'scaffold_info': automation_engine.scaffold_templates[template_key],
+                    'confidence': 1.0
+                }
+                
+                console.print(f"🏗️ Scaffolding {scaffold_info['scaffold_info'].description}")
+                success = automation_engine.execute_scaffolding(scaffold_info, project_path)
+                
+                if success:
+                    console.print("✅ Scaffolding completed successfully!")
+                else:
+                    console.print("❌ Scaffolding failed!")
+            else:
+                console.print(f"❌ Unknown scaffold type: {scaffold_type}")
+                console.print("Available types: livewire, controller, model, crud")
+        else:
+            console.print("❌ Please provide both --type and name, or use natural language")
+    
+    except Exception as e:
+        console.print(f"❌ Error during scaffolding: {e}")
+
+@cli.command()
+@click.option('--project', '-p', help='Project path (default: current directory)')
+@click.option('--generate', is_flag=True, help='Generate test files automatically')
+def generate_tests(project, generate):
+    """Generate intelligent test suggestions and files"""
+    console.print(Panel.fit("🧪 Test Generation Assistant", style="bold green"))
+    
+    try:
+        project_path = project or os.getcwd()
+        
+        # Initialize components
+        config_manager = ConfigManager()
+        todo_manager = TodoManager(config_manager.config_dir)
+        tech_detector = TechStackDetector(config_manager.config_dir)
+        automation_engine = EnhancedAutomationEngine(todo_manager, None, None, tech_detector)
+        
+        console.print(f"🔍 Analyzing project for test opportunities: {project_path}")
+        
+        # Generate test suggestions
+        test_suggestions = automation_engine.generate_tests_for_project(project_path)
+        
+        if not test_suggestions:
+            console.print("✅ No immediate test files needed - project looks well tested!")
+            return
+        
+        console.print(f"\n📋 Found {len(test_suggestions)} test opportunities:")
+        
+        tests_created = 0
+        for i, test_info in enumerate(test_suggestions, 1):
+            console.print(f"\n{i}. {test_info['name']}")
+            console.print(f"   Priority: {test_info['priority']}")
+            console.print(f"   Description: {test_info['description']}")
+            
+            if generate:
+                # Auto-generate
+                should_create = True
+            else:
+                # Ask user
+                should_create = Confirm.ask(f"   Create this test?", default=True)
+            
+            if should_create:
+                if test_info['type'] == 'setup_js_testing':
+                    # Special case for JS testing setup
+                    console.print("   🔧 Setting up JavaScript testing framework...")
+                    console.print("   💡 Consider running: npm install --save-dev jest @testing-library/jest-dom")
+                elif test_info.get('file_path'):
+                    # Create the test file
+                    test_file_path = Path(test_info['file_path'])
+                    test_file_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Generate test content based on template
+                    test_content = automation_engine._generate_file_content(
+                        test_info.get('template', 'basic_test'),
+                        Path(test_info['file_path']).stem.replace('Test', '')
+                    )
+                    
+                    with open(test_file_path, 'w') as f:
+                        f.write(test_content)
+                    
+                    console.print(f"   ✅ Created: {test_info['file_path']}")
+                    tests_created += 1
+                
+                # Also create a todo for manual completion
+                todo_id = todo_manager.add_todo(
+                    content=test_info['description'],
+                    todo_type="code",
+                    priority=test_info['priority']
+                )
+                console.print(f"   📝 Created todo #{todo_id}")
+        
+        if tests_created > 0:
+            console.print(f"\n🎉 Created {tests_created} test files!")
+            console.print("💡 Remember to implement the actual test logic in the generated files.")
+        
+    except Exception as e:
+        console.print(f"❌ Error generating tests: {e}")
+
+@cli.command()
+@click.option('--project', '-p', help='Project path (default: current directory)')
+@click.option('--setup', is_flag=True, help='Setup CI/CD automatically')
+def cicd_assistant(project, setup):
+    """Setup CI/CD pipelines for TALL Stack projects"""
+    console.print(Panel.fit("🚀 CI/CD Pipeline Assistant", style="bold yellow"))
+    
+    try:
+        project_path = project or os.getcwd()
+        
+        # Initialize components
+        config_manager = ConfigManager()
+        todo_manager = TodoManager(config_manager.config_dir)
+        tech_detector = TechStackDetector(config_manager.config_dir)
+        automation_engine = EnhancedAutomationEngine(todo_manager, None, None, tech_detector)
+        
+        console.print(f"🔍 Analyzing project for CI/CD opportunities: {project_path}")
+        
+        # Generate CI/CD suggestions
+        cicd_suggestions = automation_engine.generate_ci_cd_suggestions(project_path)
+        
+        if not cicd_suggestions:
+            console.print("✅ CI/CD pipeline appears to be well configured!")
+            return
+        
+        console.print(f"\n📋 Found {len(cicd_suggestions)} CI/CD improvements:")
+        
+        pipelines_created = 0
+        for i, suggestion in enumerate(cicd_suggestions, 1):
+            console.print(f"\n{i}. {suggestion['name']}")
+            console.print(f"   Priority: {suggestion['priority']}")
+            console.print(f"   Description: {suggestion['description']}")
+            
+            if setup:
+                # Auto-setup
+                should_create = True
+            else:
+                # Ask user
+                should_create = Confirm.ask(f"   Setup this pipeline?", default=True)
+            
+            if should_create:
+                if suggestion['type'] == 'setup_github_actions':
+                    # Create .github/workflows directory
+                    workflows_dir = Path(project_path) / ".github" / "workflows"
+                    workflows_dir.mkdir(parents=True, exist_ok=True)
+                    console.print(f"   ✅ Created: .github/workflows/")
+                    pipelines_created += 1
+                
+                elif suggestion.get('template'):
+                    # Create specific pipeline file
+                    if suggestion['type'] == 'laravel_ci':
+                        file_path = Path(project_path) / ".github" / "workflows" / "laravel.yml"
+                    elif suggestion['type'] == 'node_ci':
+                        file_path = Path(project_path) / ".github" / "workflows" / "node.yml"
+                    else:
+                        file_path = Path(project_path) / ".github" / "workflows" / f"{suggestion['type']}.yml"
+                    
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Generate pipeline content
+                    pipeline_content = automation_engine._generate_file_content(
+                        suggestion['template'],
+                        suggestion['name']
+                    )
+                    
+                    with open(file_path, 'w') as f:
+                        f.write(pipeline_content)
+                    
+                    console.print(f"   ✅ Created: {file_path}")
+                    pipelines_created += 1
+                
+                # Create todo for manual configuration
+                todo_id = todo_manager.add_todo(
+                    content=f"Configure and test {suggestion['name']}",
+                    todo_type="code",
+                    priority=suggestion['priority']
+                )
+                console.print(f"   📝 Created todo #{todo_id}")
+        
+        if pipelines_created > 0:
+            console.print(f"\n🎉 Created {pipelines_created} CI/CD pipelines!")
+            console.print("💡 Remember to configure secrets and environment variables in GitHub.")
+            console.print("🔗 Visit your repository settings to add required secrets like:")
+            console.print("   - Database credentials")
+            console.print("   - Deployment keys")
+            console.print("   - API tokens")
+        
+    except Exception as e:
+        console.print(f"❌ Error setting up CI/CD: {e}")
+
+@cli.command()
+@click.argument('description')
+@click.option('--project', '-p', help='Project path (default: current directory)')
+def smart_scaffold(description, project):
+    """Natural language scaffolding - describe what you want to build"""
+    console.print(Panel.fit("🤖 AI-Powered Smart Scaffolding", style="bold magenta"))
+    
+    try:
+        project_path = project or os.getcwd()
+        
+        # Initialize components
+        config_manager = ConfigManager()
+        todo_manager = TodoManager(config_manager.config_dir)
+        tech_detector = TechStackDetector(config_manager.config_dir)
+        automation_engine = EnhancedAutomationEngine(todo_manager, None, None, tech_detector)
+        
+        console.print(f"🧠 Analyzing request: '{description}'")
+        
+        # Try to detect what the user wants to scaffold
+        scaffold_info = automation_engine.detect_scaffolding_opportunity(description, project_path)
+        
+        if scaffold_info:
+            template_info = scaffold_info['scaffold_info']
+            console.print(f"\n🎯 Detected scaffolding opportunity:")
+            console.print(f"   Template: {template_info.name}")
+            console.print(f"   Description: {template_info.description}")
+            console.print(f"   Component name: {scaffold_info['name']}")
+            console.print(f"   Confidence: {scaffold_info['confidence']:.0%}")
+            
+            if Confirm.ask("\nProceed with scaffolding?", default=True):
+                success = automation_engine.execute_scaffolding(scaffold_info, project_path)
+                
+                if success:
+                    console.print("✅ Smart scaffolding completed successfully!")
+                    
+                    # Create follow-up todos for manual steps
+                    todo_manager.add_todo(
+                        content=f"Review and customize generated {scaffold_info['name']} component",
+                        todo_type="code",
+                        priority="medium"
+                    )
+                    
+                    console.print("📝 Created follow-up todo for code review and customization")
+                else:
+                    console.print("❌ Scaffolding failed!")
+        else:
+            console.print("❌ Could not understand the scaffolding request.")
+            console.print("💡 Try being more specific, for example:")
+            console.print("   • 'create Livewire component UserProfile'")
+            console.print("   • 'generate Laravel controller ProductController'")
+            console.print("   • 'scaffold full CRUD for Product'")
+            console.print("   • 'make TailwindCSS component DropdownMenu'")
+    
+    except Exception as e:
+        console.print(f"❌ Error in smart scaffolding: {e}")
 @click.option('--daemon', '-d', is_flag=True, help='Run scheduler in daemon mode')
 @click.option('--stop', is_flag=True, help='Stop running scheduler daemon')
 def scheduler(daemon, stop):
@@ -2105,7 +2675,6 @@ def _get_task_config(task_type):
         config['model'] = _safe_prompt("Preferred model (or 'auto')", default="auto")
         
     return config
-
 
 def main():
     """Main entry point"""
