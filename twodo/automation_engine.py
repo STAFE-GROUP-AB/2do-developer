@@ -183,6 +183,45 @@ class AutomationEngine:
         
         return True
     
+    def run_all_todos_sync(self) -> bool:
+        """Synchronous wrapper for run_all_todos to avoid nested event loop issues"""
+        try:
+            return asyncio.run(self.run_all_todos())
+        except RuntimeError as e:
+            if "cannot be called from a running event loop" in str(e):
+                console.print(f"💥 Event loop conflict detected: {e}")
+                console.print("🔧 Attempting alternative async handling...")
+                # Alternative: use existing event loop if available
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # Create a new thread to run the async code
+                        import concurrent.futures
+                        import threading
+                        
+                        def run_in_thread():
+                            new_loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(new_loop)
+                            try:
+                                return new_loop.run_until_complete(self.run_all_todos())
+                            finally:
+                                new_loop.close()
+                        
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            future = executor.submit(run_in_thread)
+                            return future.result()
+                    else:
+                        return loop.run_until_complete(self.run_all_todos())
+                except Exception as thread_e:
+                    console.print(f"💥 Thread execution failed: {thread_e}")
+                    return False
+            else:
+                console.print(f"💥 Unexpected runtime error: {e}")
+                return False
+        except Exception as e:
+            console.print(f"💥 Run all todos failed: {e}")
+            return False
+    
     async def run_all_todos(self) -> bool:
         """Run multitasking on all pending todos - the ultimate shortcut"""
         todos = self.todo_manager.get_todos()

@@ -373,7 +373,8 @@ def start(repo, force_analyze):
             handle_multitask(multitasker, todo_manager, browser_integration)
         elif action == "run-all":
             # The ultimate shortcut - run all todos at once!
-            asyncio.run(automation_engine.run_all_todos())
+            # CRITICAL FIX: Make automation engine run_all_todos synchronous to avoid nested loops
+            automation_engine.run_all_todos_sync()
         elif action == "parse-markdown":
             handle_parse_markdown(todo_manager, working_dir)
         elif action == "mcp-management":
@@ -747,7 +748,7 @@ def handle_multitask(multitasker, todo_manager, browser_integration):
     console.print(f"🚀 Starting multitask processing for {len(todos)} todos...")
     
     if Confirm.ask("Proceed with multitasking?"):
-        # CRITICAL FIX: Use asyncio.run for async method call
+        # CRITICAL FIX: start_multitask is now async, use asyncio.run
         asyncio.run(multitasker.start_multitask(todos))
         console.print("✅ Multitasking completed!")
         
@@ -1766,7 +1767,8 @@ def run_all():
         automation_engine = AutomationEngine(todo_manager, multitasker, github_integration)
         
         # Run all todos
-        asyncio.run(automation_engine.run_all_todos())
+        # CRITICAL FIX: Use synchronous wrapper to avoid nested event loops
+        automation_engine.run_all_todos_sync()
         
     except Exception as e:
         console.print(f"❌ Error in run all mode: {e}")

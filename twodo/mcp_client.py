@@ -21,17 +21,17 @@ class MCPClient:
         self.filesystem_server = None
         
     async def initialize_filesystem_server(self, project_path: str = None):
-        """Initialize the filesystem MCP server for file operations"""
+        """Initialize filesystem server with project context"""
         try:
-            # CRITICAL FIX: Always use the explicitly passed project_path first
-            # This ensures we operate in the user's working directory, not the 2do source directory
+            # Use explicitly passed project_path first, then fall back to cwd
             if project_path:
-                base_path = str(Path(project_path).resolve())
-                console.print(f"🎯 Using explicit project path: {base_path}")
+                base_path = Path(project_path).resolve()
+                console.print(f"🔍 DEBUG: Using explicit project_path: {project_path} -> {base_path}")
             else:
-                base_path = str(Path.cwd().resolve())
-                console.print(f"🎯 Using current working directory: {base_path}")
+                base_path = Path.cwd()
+                console.print(f"🔍 DEBUG: Using cwd fallback: {base_path}")
             
+            console.print(f"🎯 Using explicit project path: {base_path}")
             # Start the filesystem MCP server
             cmd = [
                 "npx", "-y", "@modelcontextprotocol/server-filesystem", base_path

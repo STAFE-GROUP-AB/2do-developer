@@ -645,16 +645,17 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
             
             console.print(f"🔧 Calling {function_name} with args: {function_args}")
             
+            # Execute the filesystem operation via MCP
             try:
-                # Call the filesystem tool through MCP client
+                console.print(f"🔍 DEBUG: Executing MCP tool {function_name} with args: {function_args}")
                 result = await self.mcp_client.call_filesystem_tool(function_name, function_args)
+                console.print(f"✅ {function_name} executed successfully - Result: {str(result)[:200]}")
                 
-                # Add tool result to messages
                 messages.append({
                     "tool_call_id": tool_call.id,
                     "role": "tool",
-                    "name": function_name,
-                    "content": result
+                    "name": function_name, 
+                    "content": str(result)
                 })
                 
             except Exception as e:
