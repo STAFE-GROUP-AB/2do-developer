@@ -26,6 +26,7 @@ from .image_handler import ImageHandler
 
 from .setup_guide import SetupGuide
 from .mcp_manager import MCPServerManager
+from .updater import UpdateManager
 
 
 console = Console()
@@ -348,6 +349,25 @@ def mcp(project, list_servers, recommend):
     except Exception as e:
         console.print(f"❌ Error during MCP server management: {e}")
         console.print("💡 Try running '2do setup' first to ensure proper configuration")
+
+@cli.command()
+@click.option('--check-only', is_flag=True, help='Only check for updates without installing')
+@click.option('--force', is_flag=True, help='Force update even if already up to date')
+def update(check_only, force):
+    """Check for and install 2DO updates"""
+    try:
+        updater = UpdateManager()
+        
+        if check_only:
+            updater.check_only()
+        else:
+            success = updater.run_update_process(force=force)
+            if not success:
+                # Exit with error code if update failed
+                raise click.ClickException("Update failed")
+    except Exception as e:
+        console.print(f"❌ Update error: {e}")
+        raise click.ClickException("Update process failed")
 
 def handle_add_todo(todo_manager, ai_router, image_handler):
     """Handle adding a new todo item"""

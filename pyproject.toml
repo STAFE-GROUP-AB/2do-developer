@@ -33,6 +33,8 @@ dependencies = [
     "psutil>=5.9.0",
     "pillow>=10.0.0",
     "pyperclip>=1.8.0",
+    "packaging>=21.0",
+    "toml>=0.10.2",
 ]
 
 [project.urls]

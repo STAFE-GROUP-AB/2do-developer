@@ -89,3 +89,6 @@ Thumbs.db
 # Temporary files
 /tmp/
 temp/
+
+# Test files (not to be committed)
+test_*.py
