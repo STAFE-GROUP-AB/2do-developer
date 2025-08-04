@@ -23,6 +23,8 @@ setup(
         "packaging>=21.0",
         "toml>=0.10.2",
         "python-dotenv>=1.0.0",
+        "croniter>=6.0.0",
+        "apscheduler>=3.11.0",
     ],
     entry_points={
         "console_scripts": [
