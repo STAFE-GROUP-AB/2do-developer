@@ -107,6 +107,58 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+## Updates
+
+### 🔄 Automatic Updates
+
+2DO includes a built-in update system that supports multiple installation methods:
+
+```bash
+# Check for updates
+2do update --check-only
+
+# Update to latest version
+2do update
+
+# Force update from main branch (useful for development versions)
+2do update --force
+```
+
+**Update Features:**
+- ✅ **Automatic version detection** - Compares your version with latest releases
+- ✅ **Multiple update methods** - Supports installer script, pip, and source installations
+- ✅ **Backup and rollback** - Creates backups before updating (installer method)
+- ✅ **Smart detection** - Automatically detects how 2DO was installed
+- ✅ **Progress tracking** - Shows clear progress during updates
+- ✅ **Error handling** - Graceful fallbacks if update fails
+
+**Supported Update Methods:**
+- **Installer Script**: Re-runs the original installation script (most stable)
+- **Pip Update**: Updates via `pip install --upgrade` from GitHub
+- **Source Update**: Pulls latest changes via `git pull` (for development)
+
+### 🛠️ Manual Update Methods
+
+If automatic updates don't work, you can update manually:
+
+#### For Installer Script Installations:
+```bash
+# Re-run the installer
+curl -fsSL https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.sh | bash
+```
+
+#### For Pip Installations:
+```bash
+pip install --upgrade git+https://github.com/STAFE-GROUP-AB/2do-developer.git
+```
+
+#### For Source Installations:
+```bash
+cd /path/to/2do-developer
+git pull origin main
+pip install -e .
+```
+
 ## Quick Start
 
 ### 1. Initial Setup
@@ -149,6 +201,14 @@ cd /path/to/your/git/project
 - **export-todos-to-github**: Export your todos as GitHub issues (with sub-task linking)
 - **chat**: Interactive chat with intelligent AI model routing (supports images)
 - **quit**: Exit the session
+
+#### Command Line Features
+- **2do setup**: Configure AI model API keys and GitHub integration
+- **2do start**: Start the interactive session
+- **2do verify**: Verify setup and guide through missing components
+- **2do mcp**: Manage MCP (Model Context Protocol) servers
+- **🆕 2do update**: Check for and install updates automatically
+- **2do --help**: Show help and available commands
 
 ## Usage Examples
 
