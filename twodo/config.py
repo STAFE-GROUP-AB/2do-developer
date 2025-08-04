@@ -14,7 +14,12 @@ class ConfigManager:
     def __init__(self, project_dir=None, suppress_prompts=False):
         # If project_dir is provided and is a git repo, use local 2DO folder
         if project_dir and self._is_git_repo(project_dir):
-            self.config_dir = Path(project_dir) / "2DO"
+            # Check for both '2DO' and '2dos' directories
+            project_path = Path(project_dir)
+            if (project_path / "2dos").exists():
+                self.config_dir = project_path / "2dos" / ".2do"
+            else:
+                self.config_dir = project_path / "2DO"
             self.is_local_project = True
         else:
             self.config_dir = Path.home() / ".2do"
