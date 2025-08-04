@@ -447,6 +447,9 @@ def analyze(project, force):
         
     except Exception as e:
         console.print(f"❌ Error during analysis: {e}")
+
+
+@cli.command()
 @click.option('--check-only', is_flag=True, help='Only check for updates without installing')
 @click.option('--force', is_flag=True, help='Force update even if already up to date')
 def update(check_only, force):
@@ -463,7 +466,7 @@ def update(check_only, force):
                 raise click.ClickException("Update failed")
     except Exception as e:
         console.print(f"❌ Update error: {e}")
-        raise click.ClickException("Update process failed"
+        raise click.ClickException("Update process failed")
 
 def handle_add_todo(todo_manager, ai_router, image_handler):
     """Handle adding a new todo item"""
