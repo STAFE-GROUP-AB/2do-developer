@@ -546,7 +546,7 @@ class Scheduler:
             
             # Update next run time
             job = self.scheduler.get_job(schedule_config.name)
-            if job:
+            if job and hasattr(job, 'next_run_time'):
                 schedule_config.next_run = job.next_run_time
                 
         except Exception as e:
@@ -577,7 +577,7 @@ class Scheduler:
             
             # Update next run time
             job = self.scheduler.get_job(schedule_name)
-            if job:
+            if job and hasattr(job, 'next_run_time'):
                 schedule_config.next_run = job.next_run_time
                 
         except Exception as e:
