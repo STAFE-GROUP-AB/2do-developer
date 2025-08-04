@@ -17,26 +17,37 @@ class Multitasker:
         self.ai_router = ai_router
         self.max_workers = 5  # Maximum concurrent tasks
     
-    async def process_todo_async(self, todo: Dict) -> Dict:
+    async def process_todo_async(self, todo: Dict, progress_callback=None) -> Dict:
         """Process a single todo asynchronously"""
         try:
             # Update status to in_progress
             todo["status"] = "in_progress"
             
+            # Show what we're working on
+            todo_title = todo['title'][:50] + "..." if len(todo['title']) > 50 else todo['title']
+            console.print(f"🔨 Starting work on: [bold cyan]{todo_title}[/bold cyan]")
+            
             # Create prompt based on todo type and content
             prompt = self._create_prompt_for_todo(todo)
             
+            # Show routing stage
+            console.print(f"🤔 Analyzing task requirements for optimal AI model...")
+            
             # Route to best AI model and process
-            result = self.ai_router.route_and_process(prompt)
+            result = self.ai_router.route_and_process(prompt, todo_context=todo_title)
             
             # Update todo with result
             todo["status"] = "completed"
             todo["result"] = result
             
+            # Show completion
+            console.print(f"✅ Completed: [bold green]{todo_title}[/bold green]")
+            
             return todo
             
         except Exception as e:
-            console.print(f"❌ Error processing todo {todo['id']}: {str(e)}")
+            todo_title = todo['title'][:50] + "..." if len(todo['title']) > 50 else todo['title']
+            console.print(f"❌ Error processing [bold red]{todo_title}[/bold red]: {str(e)}")
             todo["status"] = "failed"
             todo["result"] = f"Error: {str(e)}"
             return todo
@@ -121,16 +132,32 @@ class Multitasker:
     async def _process_todos_parallel(self, todos: List[Dict]) -> List[Dict]:
         """Process todos in parallel with progress tracking"""
         
+        # Show overview of what will be processed
+        console.print(f"\n📋 About to process {len(todos)} todos:")
+        for i, todo in enumerate(todos[:5], 1):  # Show first 5
+            todo_preview = todo['title'][:40] + "..." if len(todo['title']) > 40 else todo['title']
+            console.print(f"   {i}. [cyan]{todo_preview}[/cyan] ({todo['priority']} priority)")
+        if len(todos) > 5:
+            console.print(f"   ... and {len(todos) - 5} more todos")
+        console.print("")
+        
         with Progress() as progress:
-            task = progress.add_task("[cyan]Processing todos...", total=len(todos))
+            task = progress.add_task(f"[cyan]Processing {len(todos)} todos...", total=len(todos))
+            completed_count = 0
             
             # Create semaphore to limit concurrent tasks
             semaphore = asyncio.Semaphore(self.max_workers)
             
             async def process_with_semaphore(todo):
+                nonlocal completed_count
                 async with semaphore:
                     result = await self.process_todo_async(todo)
-                    progress.advance(task)
+                    completed_count += 1
+                    
+                    # Update progress with current status
+                    progress.update(task, 
+                                  advance=1, 
+                                  description=f"[cyan]Processed {completed_count}/{len(todos)} todos...")
                     return result
             
             # Create tasks for all todos
