@@ -1,3 +1,5 @@
+![2DO](image.png)
+
 # 2DO
 
 🤖 **2DO** is an intelligent command line tool that automatically selects the best AI model for your prompts and enables powerful multitasking capabilities for developers.

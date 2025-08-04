@@ -58,6 +58,199 @@ class MCPClient:
             console.print(f"❌ Failed to initialize filesystem MCP server: {e}")
             return False
     
+    async def initialize_all_configured_servers(self, project_path: str = None):
+        """Initialize all configured MCP servers for comprehensive tool access"""
+        try:
+            # Initialize filesystem server first
+            filesystem_success = await self.initialize_filesystem_server(project_path)
+            
+            if not self.config_manager:
+                console.print("⚠️ No config manager available, only filesystem server initialized")
+                return filesystem_success
+            
+            # Get all configured MCP servers
+            configured_servers = self.config_manager.get_mcp_servers()
+            if not configured_servers:
+                console.print("⚠️ No additional MCP servers configured")
+                return filesystem_success
+            
+            # Initialize each configured server
+            for server in configured_servers:
+                if server.get('name') == 'Filesystem MCP Server':
+                    continue  # Already initialized
+                
+                if not server.get('enabled', True):
+                    continue  # Skip disabled servers
+                
+                try:
+                    await self._initialize_mcp_server(server, project_path)
+                except Exception as e:
+                    console.print(f"⚠️ Failed to initialize {server['name']}: {e}")
+                    continue
+            
+            console.print(f"✅ Initialized {len(self.active_servers)} MCP servers total")
+            return True
+            
+        except Exception as e:
+            console.print(f"❌ Failed to initialize MCP servers: {e}")
+            return filesystem_success
+    
+    async def _initialize_mcp_server(self, server_config: Dict, project_path: str = None):
+        """Initialize a specific MCP server"""
+        server_name = server_config['name']
+        command = server_config['command']
+        
+        console.print(f"🔧 Initializing {server_name}...")
+        
+        # Parse command (e.g., "uvx mcp-server-git")
+        cmd_parts = command.split()
+        if project_path:
+            cmd_parts.append(str(Path(project_path).resolve()))
+        
+        # Create the server process
+        process = await asyncio.create_subprocess_exec(
+            *cmd_parts,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        # Get tools for this server
+        tools = await self._get_server_tools(server_name, server_config)
+        
+        # Store in active servers
+        self.active_servers[server_name] = {
+            'process': process,
+            'config': server_config,
+            'tools': tools,
+            'base_path': project_path
+        }
+        
+        console.print(f"✅ {server_name} initialized with {len(tools)} tools")
+    
+    async def _get_server_tools(self, server_name: str, server_config: Dict) -> List[Dict]:
+        """Get tools available from a specific MCP server"""
+        # For now, return predefined tools based on server type
+        # In a full implementation, this would query the actual MCP server
+        
+        if 'git' in server_name.lower():
+            return await self._get_git_tools()
+        elif 'github' in server_name.lower():
+            return await self._get_github_tools()
+        elif 'context' in server_name.lower():
+            return await self._get_context_tools()
+        else:
+            return []  # Unknown server type
+    
+    async def _get_git_tools(self) -> List[Dict]:
+        """Get Git MCP server tools"""
+        return [
+            {
+                "name": "git_log",
+                "description": "Get git commit history and logs",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "limit": {"type": "integer", "description": "Number of commits to show", "default": 10},
+                        "path": {"type": "string", "description": "Specific file or directory path"}
+                    }
+                }
+            },
+            {
+                "name": "git_status",
+                "description": "Get current git repository status",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "git_diff",
+                "description": "Get git diff for changes",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "staged": {"type": "boolean", "description": "Show staged changes", "default": False},
+                        "path": {"type": "string", "description": "Specific file path"}
+                    }
+                }
+            },
+            {
+                "name": "git_branch_info",
+                "description": "Get information about git branches",
+                "parameters": {"type": "object", "properties": {}}
+            }
+        ]
+    
+    async def _get_github_tools(self) -> List[Dict]:
+        """Get GitHub MCP server tools"""
+        return [
+            {
+                "name": "github_repo_info",
+                "description": "Get GitHub repository information and metadata",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "github_issues",
+                "description": "List GitHub issues for the repository",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "state": {"type": "string", "enum": ["open", "closed", "all"], "default": "open"},
+                        "limit": {"type": "integer", "description": "Number of issues to fetch", "default": 10}
+                    }
+                }
+            },
+            {
+                "name": "github_pull_requests",
+                "description": "List GitHub pull requests for the repository",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "state": {"type": "string", "enum": ["open", "closed", "all"], "default": "open"},
+                        "limit": {"type": "integer", "description": "Number of PRs to fetch", "default": 10}
+                    }
+                }
+            },
+            {
+                "name": "github_readme",
+                "description": "Get the repository README content",
+                "parameters": {"type": "object", "properties": {}}
+            }
+        ]
+    
+    async def _get_context_tools(self) -> List[Dict]:
+        """Get Context7 MCP server tools"""
+        return [
+            {
+                "name": "context_search",
+                "description": "Search through project context and memory",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search query"},
+                        "limit": {"type": "integer", "description": "Number of results", "default": 5}
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
+                "name": "context_analyze",
+                "description": "Analyze project structure and dependencies",
+                "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "name": "context_memory",
+                "description": "Store or retrieve project context memory",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string", "enum": ["store", "retrieve"], "default": "retrieve"},
+                        "key": {"type": "string", "description": "Memory key"},
+                        "value": {"type": "string", "description": "Value to store (for store action)"}
+                    },
+                    "required": ["key"]
+                }
+            }
+        ]
+    
     async def _get_filesystem_tools(self):
         """Get available tools from filesystem MCP server"""
         return [
@@ -274,8 +467,31 @@ class MCPClient:
         except Exception as e:
             return f"Error listing directory {dir_path}: {str(e)}"
     
+    def get_all_tools_for_openai(self) -> List[Dict]:
+        """Get all available tools formatted for OpenAI function calling"""
+        all_tools = []
+        
+        # Add filesystem tools
+        if self.filesystem_server:
+            for tool in self.filesystem_server['tools']:
+                all_tools.append({
+                    "type": "function",
+                    "function": tool
+                })
+        
+        # Add tools from all other configured servers
+        for server_name, server_data in self.active_servers.items():
+            for tool in server_data.get('tools', []):
+                all_tools.append({
+                    "type": "function",
+                    "function": tool
+                })
+        
+        console.print(f"🔧 Providing {len(all_tools)} total tools to OpenAI model")
+        return all_tools
+    
     def get_filesystem_tools_for_openai(self) -> List[Dict]:
-        """Get filesystem tools formatted for OpenAI function calling"""
+        """Get filesystem tools formatted for OpenAI function calling (legacy method)"""
         if not self.filesystem_server:
             return []
         
@@ -287,8 +503,35 @@ class MCPClient:
             for tool in self.filesystem_server['tools']
         ]
     
+    def get_all_tools_for_anthropic(self) -> List[Dict]:
+        """Get all available tools formatted for Anthropic tool use"""
+        all_tools = []
+        
+        # Add filesystem tools
+        if self.filesystem_server:
+            for tool in self.filesystem_server['tools']:
+                anthropic_tool = {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "input_schema": tool["parameters"]
+                }
+                all_tools.append(anthropic_tool)
+        
+        # Add tools from all other configured servers
+        for server_name, server_data in self.active_servers.items():
+            for tool in server_data.get('tools', []):
+                anthropic_tool = {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "input_schema": tool["parameters"]
+                }
+                all_tools.append(anthropic_tool)
+        
+        console.print(f"🔧 Providing {len(all_tools)} total tools to Anthropic model")
+        return all_tools
+    
     def get_filesystem_tools_for_anthropic(self) -> List[Dict]:
-        """Get filesystem tools formatted for Anthropic tool use"""
+        """Get filesystem tools formatted for Anthropic tool use (legacy method)"""
         if not self.filesystem_server:
             return []
         

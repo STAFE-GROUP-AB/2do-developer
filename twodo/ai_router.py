@@ -438,10 +438,19 @@ class AIRouter:
         self.developer_context = context
     
     async def initialize_filesystem(self, project_path: str = None):
-        """Initialize MCP filesystem server for file operations"""
+        """Initialize MCP filesystem server for file operations (legacy method)"""
         if not self.filesystem_initialized:
             success = await self.mcp_client.initialize_filesystem_server(project_path)
             self.filesystem_initialized = success
+            return success
+        return True
+    
+    async def initialize_all_servers(self, project_path: str = None):
+        """Initialize all configured MCP servers for comprehensive tool access"""
+        if not self.filesystem_initialized:
+            success = await self.mcp_client.initialize_all_configured_servers(project_path)
+            self.filesystem_initialized = success
+            console.print(f"🚀 All MCP servers initialized: {success}")
             return success
         return True
     
@@ -590,30 +599,29 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
             # Prepare messages
             messages = [{"role": "user", "content": enhanced_prompt}]
             
-            # Add filesystem tools if available
-            tools = None
-            if self.filesystem_initialized:
-                tools = self.mcp_client.get_filesystem_tools_for_openai()
+            # Get all available tools for function calling
+            tools = self.mcp_client.get_all_tools_for_openai()
+            
+            # Add tools to the request if available
+            request_params = {
+                'model': model_name,
+                'messages': messages,
+                'temperature': 0.7,
+                'max_tokens': 4000
+            }
+            
+            if tools:
+                request_params['tools'] = tools
+                request_params['tool_choice'] = 'auto'
+                console.print(f"🔧 OpenAI model has access to {len(tools)} tools for comprehensive analysis")
             
             # Create completion with or without tools
+            response = client.chat.completions.create(**request_params)
+            
+            # Handle tool calls if tools were provided
             if tools:
-                response = client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    tools=tools,
-                    tool_choice="auto",
-                    temperature=0.7
-                )
-                
-                # Handle tool calls - CRITICAL FIX: Use await instead of asyncio.run()
                 return await self._handle_openai_tool_calls(response, messages, client, model_name)
             else:
-                response = client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    temperature=0.7
-                )
-                
                 return response.choices[0].message.content
                 
         except Exception as e:
@@ -754,7 +762,9 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
             # Add filesystem tools if available
             tools = None
             if self.filesystem_initialized:
-                tools = self.mcp_client.get_filesystem_tools_for_anthropic()
+                tools = self.mcp_client.get_all_tools_for_anthropic()
+                if tools:
+                    console.print(f"🔧 Anthropic model has access to {len(tools)} tools for comprehensive analysis")
             
             # Create completion with or without tools
             if tools:

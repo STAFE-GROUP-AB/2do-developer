@@ -1715,9 +1715,9 @@ def github_pro():
         todo_manager = TodoManager(config_manager.config_dir)
         ai_router = AIRouter(config_manager)
         
-        # CRITICAL FIX: Initialize filesystem server with correct project path
-        console.print(f"🎯 Initializing filesystem for directory: {working_dir}")
-        asyncio.run(ai_router.initialize_filesystem(working_dir))
+        # CRITICAL FIX: Initialize all MCP servers with correct project path
+        console.print(f"🎯 Initializing all MCP servers for directory: {working_dir}")
+        asyncio.run(ai_router.initialize_all_servers(working_dir))
         
         multitasker = Multitasker(ai_router, todo_manager)
         
@@ -1757,9 +1757,9 @@ def run_all():
         todo_manager = TodoManager(config_manager.config_dir)
         ai_router = AIRouter(config_manager)
         
-        # CRITICAL FIX: Initialize filesystem server with correct project path
-        console.print(f"🎯 Initializing filesystem for directory: {working_dir}")
-        asyncio.run(ai_router.initialize_filesystem(working_dir))
+        # CRITICAL FIX: Initialize all MCP servers with correct project path
+        console.print(f"🎯 Initializing all MCP servers for directory: {working_dir}")
+        asyncio.run(ai_router.initialize_all_servers(working_dir))
         
         multitasker = Multitasker(ai_router, todo_manager)
         
@@ -1800,9 +1800,9 @@ def smart_todo(request):
         todo_manager = TodoManager(config_manager.config_dir)
         ai_router = AIRouter(config_manager)
         
-        # CRITICAL FIX: Initialize filesystem server with correct project path
-        console.print(f"🎯 Initializing filesystem for directory: {working_dir}")
-        asyncio.run(ai_router.initialize_filesystem(working_dir))
+        # CRITICAL FIX: Initialize all MCP servers with correct project path
+        console.print(f"🎯 Initializing all MCP servers for directory: {working_dir}")
+        asyncio.run(ai_router.initialize_all_servers(working_dir))
         
         multitasker = Multitasker(ai_router, todo_manager)
         
