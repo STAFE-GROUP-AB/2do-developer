@@ -3,6 +3,15 @@
 2DO CLI - Main command line interface
 """
 
+# Suppress urllib3 SSL warnings that can appear on macOS with LibreSSL
+# Must be done before importing any packages that use urllib3
+try:
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.NotOpenSSLWarning)
+except (ImportError, AttributeError):
+    # If urllib3 not available or warning type doesn't exist, ignore
+    pass
+
 import click
 import os
 import yaml
