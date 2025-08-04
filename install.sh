@@ -17,6 +17,24 @@ REPO_URL="https://github.com/STAFE-GROUP-AB/2do-developer"
 INSTALL_DIR="$HOME/.local/bin"
 VENV_DIR="$HOME/.2do"
 
+# Cleanup function
+cleanup_on_exit() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        print_error "Installation failed. Cleaning up..."
+        if [ -d "$VENV_DIR" ]; then
+            rm -rf "$VENV_DIR"
+        fi
+        if [ -f "$INSTALL_DIR/2do" ]; then
+            rm -f "$INSTALL_DIR/2do"
+        fi
+    fi
+    exit $exit_code
+}
+
+# Set trap for cleanup
+trap cleanup_on_exit EXIT
+
 # Print colored output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -166,14 +184,36 @@ install_2do() {
     local python_cmd="$1"
     local temp_dir=$(mktemp -d)
     
+    # Clean up any existing problematic venv
+    if [ -d "$VENV_DIR" ]; then
+        print_status "Removing existing virtual environment..."
+        rm -rf "$VENV_DIR"
+    fi
+    
     print_status "Creating virtual environment..."
-    $python_cmd -m venv "$VENV_DIR"
+    if ! $python_cmd -m venv "$VENV_DIR"; then
+        print_error "Failed to create virtual environment. Trying with --system-site-packages..."
+        if ! $python_cmd -m venv --system-site-packages "$VENV_DIR"; then
+            print_error "Failed to create virtual environment. Please check Python installation."
+            exit 1
+        fi
+    fi
     
     print_status "Activating virtual environment..."
     source "$VENV_DIR/bin/activate"
     
+    # Check if pip is accessible and fix permissions if needed
+    print_status "Checking pip accessibility..."
+    if [ ! -x "$VENV_DIR/bin/pip" ]; then
+        print_status "Fixing pip permissions..."
+        chmod +x "$VENV_DIR/bin/pip" 2>/dev/null || true
+        chmod +x "$VENV_DIR/bin/python"* 2>/dev/null || true
+    fi
+    
     print_status "Upgrading pip..."
-    pip install --upgrade pip
+    if ! pip install --upgrade pip --no-warn-script-location; then
+        print_warning "Pip upgrade failed, continuing with existing pip version..."
+    fi
     
     print_status "Downloading 2DO source code..."
     if command_exists git; then
@@ -203,7 +243,7 @@ install_2do() {
     local install_success=false
     for attempt in 1 2 3; do
         print_status "Installation attempt $attempt/3..."
-        if pip install . --timeout 60; then
+        if pip install . --timeout 60 --no-warn-script-location; then
             install_success=true
             break
         else
@@ -213,19 +253,40 @@ install_2do() {
     done
     
     if [ "$install_success" = false ]; then
-        print_error "Failed to install 2DO after 3 attempts. This may be due to network issues."
-        print_error "Please check your internet connection and try again."
-        exit 1
+        print_warning "Virtual environment installation failed. Trying system-wide installation..."
+        
+        # Fallback to user installation
+        print_status "Attempting user-level installation..."
+        if $python_cmd -m pip install --user . --timeout 60; then
+            print_success "Installed 2DO at user level"
+            
+            # Create wrapper script for user installation
+            cat > "$INSTALL_DIR/2do" << EOF
+#!/bin/bash
+exec $python_cmd -m twodo "\$@"
+EOF
+            chmod +x "$INSTALL_DIR/2do"
+            install_success=true
+        else
+            print_error "Failed to install 2DO after all attempts."
+            print_error "Please try manual installation:"
+            print_error "1. git clone $REPO_URL.git"
+            print_error "2. cd 2do-developer"
+            print_error "3. $python_cmd -m pip install --user ."
+            exit 1
+        fi
     fi
     
-    print_status "Creating wrapper script..."
-    cat > "$INSTALL_DIR/2do" << EOF
+    # Only create venv wrapper if we used virtual environment installation
+    if [ -f "$VENV_DIR/bin/activate" ] && [ "$install_success" = true ]; then
+        print_status "Creating virtual environment wrapper script..."
+        cat > "$INSTALL_DIR/2do" << EOF
 #!/bin/bash
 source "$VENV_DIR/bin/activate"
 exec 2do "\$@"
 EOF
-    
-    chmod +x "$INSTALL_DIR/2do"
+        chmod +x "$INSTALL_DIR/2do"
+    fi
     
     # Clean up
     rm -rf "$temp_dir"
