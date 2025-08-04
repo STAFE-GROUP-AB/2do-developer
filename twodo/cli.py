@@ -33,6 +33,7 @@ from .github_integration import GitHubIntegration
 from .browser_integration import BrowserIntegration
 from .image_handler import ImageHandler
 from .intent_router import IntentRouter
+from .permission_manager import PermissionManager, diagnose_permissions
 
 from .setup_guide import SetupGuide
 from .mcp_manager import MCPServerManager
@@ -620,7 +621,8 @@ def handle_list_todos(todo_manager):
     console.print(table)
     
     stats = todo_manager.get_completion_stats()
-    console.print(f"\n📊 Progress: {stats['completed']}/{stats['total']} completed ({stats['completion_rate']:.1f}%)")
+    completion_rate = (stats['completed'] / stats['total'] * 100) if stats['total'] > 0 else 0
+    console.print(f"\n📊 Progress: {stats['completed']}/{stats['total']} completed ({completion_rate:.1f}%)")
 
 def handle_remove_todo(todo_manager):
     """Handle removing a todo by ID"""

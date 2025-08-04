@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 from dotenv import load_dotenv
+from .permission_manager import PermissionManager
 
 class ConfigManager:
     """Manages configuration and API keys for AI models"""
@@ -34,32 +35,30 @@ class ConfigManager:
         # Load environment variables from .env file
         self._load_environment_variables()
         
-        # Ensure config directory exists with proper error handling
-        try:
-            self.config_dir.mkdir(exist_ok=True)
-        except (OSError, PermissionError) as e:
-            # Fallback to home directory if we can't create the config directory
+        # Ensure config directory exists with enhanced permission handling
+        preferred_paths = []
+        if self.is_local_project:
+            preferred_paths.append(self.config_dir)
+        preferred_paths.extend([
+            Path.home() / ".2do",
+            Path.home() / ".2do_fallback"
+        ])
+        
+        # Use PermissionManager to get a secure directory
+        secure_dir = PermissionManager.get_secure_directory(preferred_paths, "2do_config")
+        
+        # Update paths if we had to use a fallback
+        if secure_dir != self.config_dir:
+            from rich.console import Console
+            console = Console()
             if self.is_local_project:
-                from rich.console import Console
-                console = Console()
-                console.print(f"⚠️ Cannot create local 2DO directory at {self.config_dir}: {e}")
-                console.print("💡 Falling back to global configuration")
-                self.config_dir = Path.home() / ".2do"
-                self.config_file = self.config_dir / "config.yaml"
+                console.print(f"💡 Using fallback configuration directory: {secure_dir}")
                 self.is_local_project = False
-                try:
-                    self.config_dir.mkdir(exist_ok=True)
-                except (OSError, PermissionError) as global_error:
-                    # If even global config fails, use temp directory
-                    import tempfile
-                    temp_dir = Path(tempfile.gettempdir()) / "2do_config"
-                    temp_dir.mkdir(exist_ok=True)
-                    self.config_dir = temp_dir
-                    self.config_file = self.config_dir / "config.yaml"
-                    console.print(f"⚠️ Using temporary configuration directory: {self.config_dir}")
-                    console.print("⚠️ Configuration will not persist between sessions")
-            else:
-                raise
+            self.config_dir = secure_dir
+            self.config_file = self.config_dir / "config.yaml"
+        
+        # Ensure proper permissions on the config directory
+        PermissionManager.ensure_directory_permissions(self.config_dir)
         
         self._load_config()
     
@@ -228,9 +227,31 @@ class ConfigManager:
         self._save_config()
     
     def _save_config(self):
-        """Save configuration to file"""
-        with open(self.config_file, 'w') as f:
-            yaml.dump(self.config, f, default_flow_style=False)
+        """Save configuration to file with enhanced permission handling"""
+        try:
+            # Ensure directory and file permissions
+            PermissionManager.ensure_directory_permissions(self.config_file.parent)
+            
+            with open(self.config_file, 'w') as f:
+                yaml.dump(self.config, f, default_flow_style=False)
+            
+            # Set secure file permissions
+            PermissionManager.ensure_file_permissions(self.config_file)
+            
+        except (OSError, PermissionError) as e:
+            from rich.console import Console
+            console = Console()
+            console.print(f"❌ Cannot save config to {self.config_file}: {e}")
+            
+            # Try backup location
+            backup_file = self.config_file.parent / f"config_backup_{int(__import__('time').time())}.yaml"
+            try:
+                with open(backup_file, 'w') as f:
+                    yaml.dump(self.config, f, default_flow_style=False)
+                console.print(f"💾 Saved config to backup file: {backup_file}")
+            except Exception as backup_error:
+                console.print(f"❌ Cannot save backup config: {backup_error}")
+                raise Exception(f"Cannot save configuration: {e}") from e
     
     def set_api_key(self, provider: str, api_key: str):
         """Set API key for a provider"""

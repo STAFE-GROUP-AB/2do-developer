@@ -4,9 +4,11 @@ Tech Stack Detector - Analyzes repositories to detect technology stack and creat
 
 import os
 import json
+import subprocess
 from pathlib import Path
 from typing import List, Dict, Set
 from rich.console import Console
+from .permission_manager import PermissionManager
 
 console = Console()
 
@@ -18,7 +20,20 @@ class TechStackDetector:
             self.memory_dir = Path(config_dir) / "memory"
         else:
             self.memory_dir = Path.home() / ".2do" / "memory"
-        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Use PermissionManager to ensure proper directory creation
+        preferred_paths = [self.memory_dir]
+        if config_dir:
+            preferred_paths.extend([
+                Path(config_dir).parent / ".2do_fallback" / "memory",
+                Path.home() / ".2do" / "memory"
+            ])
+        else:
+            preferred_paths.append(Path.home() / ".2do_fallback" / "memory")
+        
+        secure_dir = PermissionManager.get_secure_directory(preferred_paths, "2do_memory")
+        if secure_dir != self.memory_dir:
+            self.memory_dir = secure_dir
         
         # Define file patterns for different technologies
         self.tech_patterns = {
