@@ -1,5 +1,39 @@
-api_keys: {}
-mcp_servers: []
+analysis:
+  last_analyzed: '2025-08-04T10:17:03.588184'
+  memory_files_created: false
+  tech_stack:
+  - git
+  - kubernetes
+  - python
+api_keys:
+  anthropic: your_anthropic_api_key_here
+  github: your_github_token_here
+  openai: your_openai_api_key_here
+mcp_servers:
+- category: essential
+  command: uvx context7
+  description: Advanced context management and memory for AI applications
+  enabled: true
+  name: Context7 (Upstash)
+  repository: https://github.com/upstash/context7
+- category: essential
+  command: uvx mcp-server-filesystem
+  description: File system operations and management
+  enabled: true
+  name: Filesystem MCP Server
+  repository: https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem
+- category: development
+  command: uvx mcp-server-git
+  description: Git repository operations and version control
+  enabled: true
+  name: Git MCP Server
+  repository: https://github.com/modelcontextprotocol/servers/tree/main/src/git
+- category: development
+  command: uvx mcp-server-github
+  description: GitHub API integration for issues, PRs, and repositories
+  enabled: true
+  name: GitHub MCP Server
+  repository: https://github.com/modelcontextprotocol/servers/tree/main/src/github
 preferences:
   default_model: auto
   max_parallel_tasks: 5

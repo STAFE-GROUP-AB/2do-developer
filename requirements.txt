@@ -16,3 +16,4 @@ pyperclip>=1.8.0
 packaging>=21.0
 toml>=0.10.2
 mcp>=1.0.0
+python-dotenv>=1.0.0

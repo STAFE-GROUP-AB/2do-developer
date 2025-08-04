@@ -143,6 +143,31 @@ class IntentRouter:
                     "confidence": 0.9
                 }
             ],
+            "remove-todo": [
+                {
+                    "patterns": [
+                        r"(remove|delete|del)\s+(todo|task|item)",
+                        r"(todo|task)\s+.*(remove|delete|del)",
+                        r"(get\s+rid\s+of|eliminate)\s+.*(todo|task)",
+                        r"(remove|delete)\s+.*(by\s+id|specific)",
+                        r"(cancel|drop)\s+.*(todo|task)",
+                    ],
+                    "confidence": 0.9
+                }
+            ],
+            "remove-completed-todos": [
+                {
+                    "patterns": [
+                        r"(remove|delete|clear)\s+.*(completed|done|finished)\s+.*(todos|tasks)",
+                        r"(clean\s+up|cleanup)\s+.*(completed|done|finished)",
+                        r"(clear|remove|delete)\s+.*(all\s+)?(completed|done|finished)",
+                        r"(completed|done|finished)\s+.*(remove|delete|clear|cleanup)",
+                        r"(bulk\s+)?(delete|remove)\s+.*(completed|done)",
+                        r"(archive|cleanup)\s+.*(todos|tasks)",
+                    ],
+                    "confidence": 0.95
+                }
+            ],
             "mcp-management": [
                 {
                     "patterns": [
@@ -321,6 +346,18 @@ class IntentRouter:
                 "🌐 Setting up browser integration for you!",
                 "⚡ Getting your dev environment ready!",
                 "🚀 Browser mode activated!",
+            ],
+            "remove-todo": [
+                "🗑️ I'll help you remove that todo!",
+                "✂️ Time to clean up your task list!",
+                "🧹 Let's get rid of that todo for you!",
+                "❌ Ready to delete that task!",
+            ],
+            "remove-completed-todos": [
+                "🧽 Time for some spring cleaning!",
+                "✨ Let's clear out those completed tasks!",
+                "🗂️ I'll help you archive the finished work!",
+                "🎉 Ready to celebrate by cleaning up completed todos!",
             ],
             "mcp-management": [
                 "🔌 Let's manage your MCP servers!",

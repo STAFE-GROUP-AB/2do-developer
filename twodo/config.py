@@ -7,6 +7,8 @@ import yaml
 import json
 from pathlib import Path
 from typing import Dict, Optional
+from dotenv import load_dotenv
+from .permission_manager import PermissionManager
 
 class ConfigManager:
     """Manages configuration and API keys for AI models"""
@@ -30,32 +32,33 @@ class ConfigManager:
         self.global_config_file = self.global_config_dir / "config.yaml"
         self.suppress_prompts = suppress_prompts
         
-        # Ensure config directory exists with proper error handling
-        try:
-            self.config_dir.mkdir(exist_ok=True)
-        except (OSError, PermissionError) as e:
-            # Fallback to home directory if we can't create the config directory
+        # Load environment variables from .env file
+        self._load_environment_variables()
+        
+        # Ensure config directory exists with enhanced permission handling
+        preferred_paths = []
+        if self.is_local_project:
+            preferred_paths.append(self.config_dir)
+        preferred_paths.extend([
+            Path.home() / ".2do",
+            Path.home() / ".2do_fallback"
+        ])
+        
+        # Use PermissionManager to get a secure directory
+        secure_dir = PermissionManager.get_secure_directory(preferred_paths, "2do_config")
+        
+        # Update paths if we had to use a fallback
+        if secure_dir != self.config_dir:
+            from rich.console import Console
+            console = Console()
             if self.is_local_project:
-                from rich.console import Console
-                console = Console()
-                console.print(f"⚠️ Cannot create local 2DO directory at {self.config_dir}: {e}")
-                console.print("💡 Falling back to global configuration")
-                self.config_dir = Path.home() / ".2do"
-                self.config_file = self.config_dir / "config.yaml"
+                console.print(f"💡 Using fallback configuration directory: {secure_dir}")
                 self.is_local_project = False
-                try:
-                    self.config_dir.mkdir(exist_ok=True)
-                except (OSError, PermissionError) as global_error:
-                    # If even global config fails, use temp directory
-                    import tempfile
-                    temp_dir = Path(tempfile.gettempdir()) / "2do_config"
-                    temp_dir.mkdir(exist_ok=True)
-                    self.config_dir = temp_dir
-                    self.config_file = self.config_dir / "config.yaml"
-                    console.print(f"⚠️ Using temporary configuration directory: {self.config_dir}")
-                    console.print("⚠️ Configuration will not persist between sessions")
-            else:
-                raise
+            self.config_dir = secure_dir
+            self.config_file = self.config_dir / "config.yaml"
+        
+        # Ensure proper permissions on the config directory
+        PermissionManager.ensure_directory_permissions(self.config_dir)
         
         self._load_config()
     
@@ -63,6 +66,25 @@ class ConfigManager:
         """Check if the path is a git repository"""
         git_dir = Path(path) / ".git"
         return git_dir.exists()
+    
+    def _load_environment_variables(self):
+        """Load environment variables from .env file"""
+        # Try to load from project root first, then from current directory
+        env_paths = []
+        
+        # If we're in a project, look for .env in project root
+        if hasattr(self, 'config_dir') and self.is_local_project:
+            project_root = self.config_dir.parent.parent if self.config_dir.name == '.2do' else self.config_dir.parent
+            env_paths.append(project_root / '.env')
+        
+        # Also check current working directory
+        env_paths.append(Path.cwd() / '.env')
+        
+        # Load from the first .env file found
+        for env_path in env_paths:
+            if env_path.exists():
+                load_dotenv(env_path)
+                break
     
     def _load_config(self):
         """Load configuration from file"""
@@ -81,7 +103,8 @@ class ConfigManager:
                 "analysis": {
                     "last_analyzed": None,
                     "tech_stack": [],
-                    "memory_files_created": False
+                    "memory_files_created": False,
+                    "analysis_completed": False
                 }
             }
             self._save_config()
@@ -204,9 +227,31 @@ class ConfigManager:
         self._save_config()
     
     def _save_config(self):
-        """Save configuration to file"""
-        with open(self.config_file, 'w') as f:
-            yaml.dump(self.config, f, default_flow_style=False)
+        """Save configuration to file with enhanced permission handling"""
+        try:
+            # Ensure directory and file permissions
+            PermissionManager.ensure_directory_permissions(self.config_file.parent)
+            
+            with open(self.config_file, 'w') as f:
+                yaml.dump(self.config, f, default_flow_style=False)
+            
+            # Set secure file permissions
+            PermissionManager.ensure_file_permissions(self.config_file)
+            
+        except (OSError, PermissionError) as e:
+            from rich.console import Console
+            console = Console()
+            console.print(f"❌ Cannot save config to {self.config_file}: {e}")
+            
+            # Try backup location
+            backup_file = self.config_file.parent / f"config_backup_{int(__import__('time').time())}.yaml"
+            try:
+                with open(backup_file, 'w') as f:
+                    yaml.dump(self.config, f, default_flow_style=False)
+                console.print(f"💾 Saved config to backup file: {backup_file}")
+            except Exception as backup_error:
+                console.print(f"❌ Cannot save backup config: {backup_error}")
+                raise Exception(f"Cannot save configuration: {e}") from e
     
     def set_api_key(self, provider: str, api_key: str):
         """Set API key for a provider"""
@@ -214,7 +259,22 @@ class ConfigManager:
         self._save_config()
     
     def get_api_key(self, provider: str) -> Optional[str]:
-        """Get API key for a provider"""
+        """Get API key for a provider - prioritize environment variables over config file"""
+        # Environment variable mapping
+        env_var_map = {
+            'openai': 'OPENAI_API_KEY',
+            'anthropic': 'ANTHROPIC_API_KEY', 
+            'github': 'GITHUB_TOKEN'
+        }
+        
+        # First check environment variables (most secure)
+        env_var = env_var_map.get(provider)
+        if env_var:
+            env_value = os.getenv(env_var)
+            if env_value and env_value.strip():
+                return env_value.strip()
+        
+        # Fallback to config file (for backward compatibility)
         return self.config["api_keys"].get(provider)
     
     def has_api_keys(self) -> bool:
@@ -247,18 +307,23 @@ class ConfigManager:
         """Check if repository has been analyzed recently"""
         analysis_config = self.config.get("analysis", {})
         last_analyzed = analysis_config.get("last_analyzed")
-        memory_files_created = analysis_config.get("memory_files_created", False)
+        analysis_completed = analysis_config.get("analysis_completed", False)
         
         # If never analyzed, return False
-        if not last_analyzed or not memory_files_created:
+        if not last_analyzed:
             return False
             
-        # Check if memory files still exist
-        if hasattr(self, 'memory_dir'):
-            memory_dir = self.config_dir / "memory"
-        else:
-            memory_dir = self.config_dir / "memory"
+        # Check if analysis was completed (new field takes precedence)
+        if "analysis_completed" in analysis_config:
+            return analysis_completed
             
+        # Backward compatibility: check memory files if no analysis_completed field
+        memory_files_created = analysis_config.get("memory_files_created", False)
+        if not memory_files_created:
+            return False
+            
+        # Check if memory files still exist for backward compatibility
+        memory_dir = self.config_dir / "memory"
         if not memory_dir.exists():
             return False
             
@@ -280,6 +345,7 @@ class ConfigManager:
         self.config["analysis"]["last_analyzed"] = datetime.datetime.now().isoformat()
         self.config["analysis"]["tech_stack"] = tech_stack
         self.config["analysis"]["memory_files_created"] = memory_files_created
+        self.config["analysis"]["analysis_completed"] = True  # New field to track completion
         self._save_config()
     
     def should_skip_analysis(self, force_reanalyze: bool = False) -> bool:
@@ -287,3 +353,20 @@ class ConfigManager:
         if force_reanalyze:
             return False
         return self.has_been_analyzed()
+    
+    def has_memory_files(self) -> bool:
+        """Check if memory files exist for the last analysis"""
+        analysis_config = self.config.get("analysis", {})
+        memory_files_created = analysis_config.get("memory_files_created", False)
+        
+        if not memory_files_created:
+            return False
+            
+        # Check if memory files still exist
+        memory_dir = self.config_dir / "memory"
+        if not memory_dir.exists():
+            return False
+            
+        # Check if we have at least one memory file
+        memory_files = list(memory_dir.glob("*_context.json"))
+        return len(memory_files) > 0

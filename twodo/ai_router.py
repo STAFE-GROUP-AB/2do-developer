@@ -6,6 +6,7 @@ import asyncio
 import json
 from typing import Dict, List, Optional
 from dataclasses import dataclass
+
 from rich.console import Console
 from .config import ConfigManager
 from .mcp_client import MCPClient
@@ -444,6 +445,43 @@ class AIRouter:
             return success
         return True
     
+    def _add_file_operation_instructions(self, prompt: str) -> str:
+        """Add explicit file operation instructions to prompt when filesystem tools are available"""
+        file_operation_context = """
+🚨 CRITICAL: You have filesystem tools available and MUST use them for file operations.
+
+🔧 AVAILABLE TOOLS (use these, don't just talk about them):
+- read_file(path): Read file contents
+- write_file(path, content): Write/update files 
+- create_directory(path): Create directories
+- list_directory(path): List directory contents
+
+⚡ MANDATORY ACTIONS for file-related tasks:
+- For "update README.md" → CALL write_file("README.md", content)
+- For "read file" → CALL read_file(path)
+- For "create file" → CALL write_file(path, content)
+- For "analyze repository" → CALL list_directory(".") then read relevant files
+
+❌ DO NOT:
+- Display code examples like ```python write_file(...)```
+- Suggest what should be done
+- Show mock code blocks
+
+✅ DO:
+- Actually call the tools to perform file operations
+- Use the tools immediately when file tasks are requested
+- Perform real file modifications, not suggestions
+
+🎯 EXAMPLE: If asked to "update README.md", you should:
+1. CALL read_file("README.md") to see current content
+2. CALL write_file("README.md", new_content) to update it
+3. Confirm the file was actually modified
+
+REMEMBER: You have real file system access - USE IT!
+"""
+        
+        return f"{file_operation_context}\n\nUser Request: {prompt}"
+    
     def route_and_process(self, prompt: str, todo_context: str = None) -> str:
         """Route prompt to best model and process it"""
         # Enhance prompt with developer context if available
@@ -544,8 +582,13 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
         try:
             client = self.clients["openai"]
             
+            # Enhance prompt with file operation instructions if filesystem is available
+            enhanced_prompt = prompt
+            if self.filesystem_initialized:
+                enhanced_prompt = self._add_file_operation_instructions(prompt)
+            
             # Prepare messages
-            messages = [{"role": "user", "content": prompt}]
+            messages = [{"role": "user", "content": enhanced_prompt}]
             
             # Add filesystem tools if available
             tools = None
@@ -645,10 +688,15 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
         try:
             client = self.clients["anthropic"]
             
+            # Enhance prompt with file operation instructions if filesystem is available
+            enhanced_prompt = prompt
+            if self.filesystem_initialized:
+                enhanced_prompt = self._add_file_operation_instructions(prompt)
+            
             response = client.messages.create(
                 model=model_name,
                 max_tokens=4000,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": enhanced_prompt}]
             )
             
             return response.content[0].text
@@ -672,7 +720,12 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
             client = self.clients["google"]
             model = client.GenerativeModel(model_name)
             
-            response = model.generate_content(prompt)
+            # Enhance prompt with file operation instructions if filesystem is available
+            enhanced_prompt = prompt
+            if self.filesystem_initialized:
+                enhanced_prompt = self._add_file_operation_instructions(prompt)
+            
+            response = model.generate_content(enhanced_prompt)
             
             if response.text:
                 return response.text

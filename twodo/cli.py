@@ -33,6 +33,7 @@ from .github_integration import GitHubIntegration
 from .browser_integration import BrowserIntegration
 from .image_handler import ImageHandler
 from .intent_router import IntentRouter
+from .permission_manager import PermissionManager, diagnose_permissions
 
 from .setup_guide import SetupGuide
 from .mcp_manager import MCPServerManager
@@ -327,11 +328,7 @@ def start(repo, force_analyze):
         )
         
         if not user_input.strip():
-            console.print("💡 Try telling me what you'd like to work on, like:")
-            console.print("   • 'Add a todo for fixing the login bug'")
-            console.print("   • 'Show me my current tasks'") 
-            console.print("   • 'Help me work on GitHub issues'")
-            console.print("   • 'I need to implement user authentication'")
+            show_natural_language_help()
             continue
         
         # Handle special commands
@@ -356,6 +353,10 @@ def start(repo, force_analyze):
             handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params)
         elif action == "list-todos":
             handle_list_todos(todo_manager)
+        elif action == "remove-todo":
+            handle_remove_todo(todo_manager)
+        elif action == "remove-completed-todos":
+            handle_remove_completed_todos(todo_manager)
         elif action == "create-subtasks":
             handle_create_subtasks(todo_manager, ai_router)
         elif action == "multitask":
@@ -533,6 +534,12 @@ def ai_list(show_free, show_configured):
 def handle_add_todo(todo_manager, ai_router, image_handler):
     """Handle adding a new todo item"""
     title = Prompt.ask("Todo title")
+    
+    # Validate title is not empty
+    if not title.strip():
+        console.print("❌ Todo title cannot be empty. Cancelling todo creation.")
+        return
+    
     description = Prompt.ask("Description (optional)", default="")
     
     todo_type = Prompt.ask(
@@ -590,58 +597,131 @@ def handle_list_todos(todo_manager):
         console.print("📝 No todos found. Add some with 'add-todo'!")
         return
     
-    table = Table(title="Your Todos")
-    table.add_column("ID", style="cyan")
-    table.add_column("Title", style="green")
-    table.add_column("Type", style="yellow")
-    table.add_column("Priority", style="red")
-    table.add_column("Status", style="blue")
-    table.add_column("Relation", style="magenta")
+    table = Table(title="📋 Your Todos")
+    table.add_column("ID", style="cyan", width=8)
+    table.add_column("Title", style="bold")
+    table.add_column("Type", style="magenta", width=8)
+    table.add_column("Priority", style="yellow", width=8)
+    table.add_column("Status", style="green", width=12)
+    table.add_column("Created", style="dim", width=10)
     
-    # Sort todos to show parent tasks first, then their sub-tasks
-    parent_todos = [todo for todo in todos if not todo.get("parent_id")]
-    sub_todos = [todo for todo in todos if todo.get("parent_id")]
+    priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    sorted_todos = sorted(todos, key=lambda x: (
+        priority_order.get(x.get("priority", "medium"), 2),
+        x.get("created_at", "")
+    ))
     
-    for todo in parent_todos:
-        # Show parent todo
-        relation = ""
-        if todo.get("sub_task_ids") and len(todo.get("sub_task_ids", [])) > 0:
-            relation = f"📁 {len(todo['sub_task_ids'])} sub-tasks"
+    for todo in sorted_todos:
+        status = todo.get("status", "pending")
+        status_display = {
+            "pending": "⏳ Pending",
+            "in_progress": "🔄 In Progress", 
+            "completed": "✅ Completed",
+            "failed": "❌ Failed"
+        }.get(status, status)
+        
+        priority = todo.get("priority", "medium")
+        priority_display = {
+            "critical": "🔥 Critical",
+            "high": "🔴 High",
+            "medium": "🟡 Medium",
+            "low": "🟢 Low"
+        }.get(priority, priority)
+        
+        created_at = todo.get("created_at", "")
+        if created_at:
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                created_display = dt.strftime("%m/%d")
+            except:
+                created_display = created_at[:10] if len(created_at) >= 10 else created_at
+        else:
+            created_display = "N/A"
+        
+        title = todo.get("title", "")
+        if len(title) > 50:
+            title = title[:47] + "..."
+        
+        if todo.get("parent_id"):
+            title = f"  ↳ {title}"  # Indent sub-tasks
+        elif todo.get("sub_task_ids") and len(todo["sub_task_ids"]) > 0:
+            title = f"📁 {title} ({len(todo['sub_task_ids'])} sub-tasks)"
         
         table.add_row(
-            str(todo["id"]),
-            todo["title"],
-            todo["todo_type"],
-            todo["priority"],
-            todo["status"],
-            relation
-        )
-        
-        # Show its sub-tasks right after
-        for sub_todo in sub_todos:
-            if sub_todo.get("parent_id") == todo["id"]:
-                table.add_row(
-                    str(sub_todo["id"]),
-                    f"  ├─ {sub_todo['title']}",  # Indent sub-tasks
-                    sub_todo["todo_type"],
-                    sub_todo["priority"],
-                    sub_todo["status"],
-                    "📎 sub-task"
-                )
-    
-    # Show any orphaned sub-tasks (shouldn't happen but just in case)
-    orphaned_subs = [todo for todo in sub_todos if not any(p["id"] == todo.get("parent_id") for p in parent_todos)]
-    for todo in orphaned_subs:
-        table.add_row(
-            str(todo["id"]),
-            todo["title"],
-            todo["todo_type"],
-            todo["priority"],
-            todo["status"],
-            "⚠️ orphaned"
+            todo.get("id", "")[:8],
+            title,
+            todo.get("todo_type", "general"),
+            priority_display,
+            status_display,
+            created_display
         )
     
     console.print(table)
+    
+    stats = todo_manager.get_completion_stats()
+    completion_rate = (stats['completed'] / stats['total'] * 100) if stats['total'] > 0 else 0
+    console.print(f"\n📊 Progress: {stats['completed']}/{stats['total']} completed ({completion_rate:.1f}%)")
+
+def handle_remove_todo(todo_manager):
+    """Handle removing a todo by ID"""
+    todos = todo_manager.get_todos()
+    
+    if not todos:
+        console.print("📝 No todos found to remove.")
+        return
+    
+    handle_list_todos(todo_manager)
+    
+    todo_id = Prompt.ask("\nEnter the ID of the todo to remove (or 'cancel' to abort)")
+    
+    if todo_id.lower() == 'cancel':
+        console.print("🚫 Todo removal cancelled.")
+        return
+    
+    todo = todo_manager.get_todo_by_id(todo_id)
+    if not todo:
+        console.print(f"❌ Todo with ID '{todo_id}' not found.")
+        return
+    
+    console.print(f"\n📋 Todo to remove: {todo['title']}")
+    if Confirm.ask("Are you sure you want to delete this todo?"):
+        success = todo_manager.delete_todo(todo_id)
+        if success:
+            console.print("✅ Todo removed successfully!")
+        else:
+            console.print("❌ Failed to remove todo.")
+    else:
+        console.print("🚫 Todo removal cancelled.")
+
+def handle_remove_completed_todos(todo_manager):
+    """Handle removing all completed todos"""
+    todos = todo_manager.get_todos()
+    completed_todos = [todo for todo in todos if todo.get("status") == "completed"]
+    
+    if not completed_todos:
+        console.print("📝 No completed todos found to remove.")
+        return
+    
+    console.print(f"\n🗑️ Found {len(completed_todos)} completed todos:")
+    for todo in completed_todos:
+        console.print(f"  • {todo['id'][:8]}: {todo['title']}")
+    
+    if Confirm.ask(f"\nAre you sure you want to delete all {len(completed_todos)} completed todos?"):
+        removed_count = 0
+        for todo in completed_todos:
+            if todo_manager.delete_todo(todo['id']):
+                removed_count += 1
+        
+        console.print(f"✅ Removed {removed_count} completed todos!")
+        
+        remaining_todos = todo_manager.get_todos()
+        if remaining_todos:
+            console.print(f"\n📋 {len(remaining_todos)} todos remaining.")
+        else:
+            console.print("\n🎉 All todos cleared! Time to add some new ones.")
+    else:
+        console.print("🚫 Cleanup cancelled.")
 
 def handle_multitask(multitasker, todo_manager, browser_integration):
     """Start multitasking on todos"""
@@ -1176,6 +1256,9 @@ def show_natural_language_help():
     console.print("   • 'Show me my current tasks'")
     console.print("   • 'What am I working on?'")
     console.print("   • 'Break down my complex task into smaller pieces'")
+    console.print("   • 'Remove todo by ID'")
+    console.print("   • 'Delete completed todos'")
+    console.print("   • 'Clean up finished tasks'")
     
     console.print("\n🐙 [bold]GitHub Integration:[/bold]")
     console.print("   • 'Show me GitHub issues'")
@@ -1214,6 +1297,11 @@ def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, 
             f"Just return the title, nothing else."
         )
         title = Prompt.ask("Todo title", default=ai_suggestion.strip())
+    
+    # Validate title is not empty
+    if not title.strip():
+        console.print("❌ Todo title cannot be empty. Cancelling todo creation.")
+        return
     
     description = Prompt.ask("Description (optional)", default="")
     

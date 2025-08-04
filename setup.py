@@ -12,11 +12,17 @@ setup(
         "pyyaml>=6.0",
         "requests>=2.28.0",
         "aiohttp>=3.8.0",
+        "asyncio>=3.4.3",
         "rich>=13.0.0",
         "PyGithub>=2.0.0",
         "GitPython>=3.1.0",
         "playwright>=1.40.0",
         "psutil>=5.9.0",
+        "pillow>=10.0.0",
+        "pyperclip>=1.8.0",
+        "packaging>=21.0",
+        "toml>=0.10.2",
+        "python-dotenv>=1.0.0",
     ],
     entry_points={
         "console_scripts": [
