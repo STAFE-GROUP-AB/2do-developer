@@ -1,0 +1,34 @@
+{
+  "description": "Python programming language",
+  "common_patterns": [
+    "Object-oriented programming",
+    "PEP 8 style guide",
+    "Virtual environments"
+  ],
+  "best_practices": [
+    "Use type hints",
+    "Follow PEP 8",
+    "Write docstrings",
+    "Use virtual environments"
+  ],
+  "common_libraries": [
+    "requests",
+    "numpy",
+    "pandas",
+    "flask",
+    "django",
+    "fastapi"
+  ],
+  "file_extensions": [
+    ".py"
+  ],
+  "testing_frameworks": [
+    "pytest",
+    "unittest"
+  ],
+  "package_managers": [
+    "pip",
+    "conda",
+    "poetry"
+  ]
+}

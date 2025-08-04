@@ -164,7 +164,9 @@ class AutomationEngine:
         # Create the todo
         todo_id = self.todo_manager.add_todo(
             auto_todo.suggested_title,
-            auto_todo.suggested_description
+            auto_todo.suggested_description,
+            "code",  # todo_type - default to code for smart todos
+            "medium"  # priority - default to medium
         )
         
         console.print(f"✅ Todo created with ID: {todo_id}")

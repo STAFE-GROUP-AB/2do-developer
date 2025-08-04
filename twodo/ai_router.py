@@ -520,7 +520,7 @@ REMEMBER: You have real file system access - USE IT!
         if model.provider == "openai":
             return await self._process_openai(model_name, prompt)
         elif model.provider == "anthropic":
-            return self._process_anthropic(model_name, prompt)
+            return await self._process_anthropic(model_name, prompt)
         elif model.provider == "google":
             return self._process_google(model_name, prompt)
         elif model.provider in ["xai", "deepseek", "mistral", "cohere", "perplexity"]:
@@ -678,29 +678,103 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
         
         return final_response.choices[0].message.content
     
+    async def _handle_anthropic_tool_calls(self, response, messages, client, model_name):
+        """Handle Anthropic tool calls for filesystem operations"""
+        # Check if the response contains tool use
+        content_blocks = response.content
+        
+        # If no tool use, return the text content
+        tool_use_blocks = [block for block in content_blocks if block.type == "tool_use"]
+        if not tool_use_blocks:
+            # Return text content if available
+            text_blocks = [block for block in content_blocks if block.type == "text"]
+            return text_blocks[0].text if text_blocks else "No response generated"
+        
+        # Add the assistant's message to conversation
+        messages.append({"role": "assistant", "content": content_blocks})
+        
+        # Process each tool use block
+        tool_results = []
+        for tool_block in tool_use_blocks:
+            function_name = tool_block.name
+            function_args = tool_block.input
+            
+            console.print(f"🔧 Calling {function_name} with args: {function_args}")
+            
+            # Execute the MCP tool asynchronously
+            try:
+                # Use await instead of asyncio.run to prevent event loop conflicts
+                result = await self.mcp_client.call_filesystem_tool(function_name, function_args)
+                console.print(f"✅ {function_name} executed successfully - Result: {result}")
+                
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_block.id,
+                    "content": result
+                })
+            except Exception as e:
+                error_result = f"Error executing {function_name}: {str(e)}"
+                console.print(f"❌ {error_result}")
+                
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_block.id,
+                    "content": error_result,
+                    "is_error": True
+                })
+        
+        # Add tool results to conversation
+        messages.append({"role": "user", "content": tool_results})
+        
+        # Get final response after tool execution
+        final_response = client.messages.create(
+            model=model_name,
+            max_tokens=4000,
+            messages=messages
+        )
+        
+        # Return the text content from the final response
+        text_blocks = [block for block in final_response.content if block.type == "text"]
+        return text_blocks[0].text if text_blocks else "No response generated"
+    
     async def cleanup(self):
         """Clean up MCP client resources"""
         if self.mcp_client:
             await self.mcp_client.cleanup()
             self.filesystem_initialized = False
     
-    def _process_anthropic(self, model_name: str, prompt: str) -> str:
-        """Process prompt using Anthropic model"""
+    async def _process_anthropic(self, model_name: str, prompt: str) -> str:
+        """Process prompt using Anthropic model with filesystem tools"""
         try:
             client = self.clients["anthropic"]
             
-            # Enhance prompt with file operation instructions if filesystem is available
-            enhanced_prompt = prompt
+            # Prepare messages
+            messages = [{"role": "user", "content": prompt}]
+            
+            # Add filesystem tools if available
+            tools = None
             if self.filesystem_initialized:
-                enhanced_prompt = self._add_file_operation_instructions(prompt)
+                tools = self.mcp_client.get_filesystem_tools_for_anthropic()
             
-            response = client.messages.create(
-                model=model_name,
-                max_tokens=4000,
-                messages=[{"role": "user", "content": enhanced_prompt}]
-            )
-            
-            return response.content[0].text
+            # Create completion with or without tools
+            if tools:
+                response = client.messages.create(
+                    model=model_name,
+                    max_tokens=4000,
+                    messages=messages,
+                    tools=tools
+                )
+                
+                # Handle tool calls
+                return await self._handle_anthropic_tool_calls(response, messages, client, model_name)
+            else:
+                response = client.messages.create(
+                    model=model_name,
+                    max_tokens=4000,
+                    messages=messages
+                )
+                
+                return response.content[0].text
         except Exception as e:
             error_msg = str(e)
             if "404" in error_msg or "not_found_error" in error_msg:

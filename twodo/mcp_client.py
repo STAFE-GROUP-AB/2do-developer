@@ -172,30 +172,63 @@ class MCPClient:
             base_path = Path(self.filesystem_server['base_path'])
             full_path = base_path / file_path
             
+            # CRITICAL DEBUG: Print full file path details
+            console.print(f"🔍 READ FILE DEBUG:")
+            console.print(f"   📁 Base path: {base_path}")
+            console.print(f"   📄 Relative path: {file_path}")
+            console.print(f"   📍 Full resolved path: {full_path.resolve()}")
+            console.print(f"   📂 File exists: {full_path.exists()}")
+            
             if not full_path.exists():
-                return f"Error: File {file_path} does not exist"
+                error_msg = f"Error: File {file_path} does not exist at {full_path.resolve()}"
+                console.print(f"   ❌ {error_msg}")
+                return error_msg
             
             with open(full_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
+            console.print(f"   ✅ File read successfully: {full_path.resolve()} ({len(content)} bytes)")
             return f"Successfully read {file_path}:\n{content}"
             
         except Exception as e:
-            return f"Error reading {file_path}: {str(e)}"
+            error_msg = f"Error reading {file_path}: {str(e)}"
+            console.print(f"❌ {error_msg}")
+            return error_msg
     
     async def _write_file(self, file_path: str, content: str) -> str:
-        """Write content to file"""
+        """Write content to a file"""
         try:
-            base_path = Path(self.filesystem_server['base_path'])
-            full_path = base_path / file_path
+            # Validate the operation
+            self._validate_file_operation(file_path, "write")
             
-            # Create parent directories if they don't exist
+            # Resolve full path
+            if self.filesystem_server:
+                base_path = self.filesystem_server['base_path']
+                full_path = base_path / file_path
+            else:
+                full_path = Path(file_path)
+            
+            # CRITICAL DEBUG: Print full file path details
+            console.print(f"🔍 WRITE FILE DEBUG:")
+            console.print(f"   📁 Base path: {self.filesystem_server['base_path'] if self.filesystem_server else 'None'}")
+            console.print(f"   📄 Relative path: {file_path}")
+            console.print(f"   📍 Full resolved path: {full_path.resolve()}")
+            console.print(f"   ✍️  Content length: {len(content)} chars")
+            console.print(f"   📝 Content preview: {content[:100]}{'...' if len(content) > 100 else ''}")
+            
+            # Create parent directories if needed
             full_path.parent.mkdir(parents=True, exist_ok=True)
             
-            with open(full_path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            # Write the file
+            full_path.write_text(content, encoding='utf-8')
             
-            console.print(f"✅ Successfully wrote to {file_path}")
+            # Verify the file was written
+            if full_path.exists():
+                actual_size = full_path.stat().st_size
+                console.print(f"   ✅ File written successfully: {full_path.resolve()} ({actual_size} bytes)")
+            else:
+                console.print(f"   ❌ File write failed: {full_path.resolve()} does not exist after write")
+            
             return f"Successfully wrote content to {file_path}"
             
         except Exception as e:
@@ -253,6 +286,23 @@ class MCPClient:
             }
             for tool in self.filesystem_server['tools']
         ]
+    
+    def get_filesystem_tools_for_anthropic(self) -> List[Dict]:
+        """Get filesystem tools formatted for Anthropic tool use"""
+        if not self.filesystem_server:
+            return []
+        
+        # Anthropic uses a different format for tools
+        anthropic_tools = []
+        for tool in self.filesystem_server['tools']:
+            anthropic_tool = {
+                "name": tool["name"],
+                "description": tool["description"],
+                "input_schema": tool["parameters"]
+            }
+            anthropic_tools.append(anthropic_tool)
+        
+        return anthropic_tools
     
     async def cleanup(self):
         """Clean up MCP server processes"""

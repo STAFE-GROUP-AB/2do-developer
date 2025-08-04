@@ -1,6 +1,7 @@
 analysis:
-  last_analyzed: '2025-08-04T10:17:03.588184'
-  memory_files_created: false
+  analysis_completed: true
+  last_analyzed: '2025-08-04T19:33:39.516459'
+  memory_files_created: true
   tech_stack:
   - git
   - kubernetes
