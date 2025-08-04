@@ -23,7 +23,7 @@ class Test2DO(unittest.TestCase):
     
     def test_config_manager(self):
         """Test configuration management"""
-        config = ConfigManager()
+        config = ConfigManager(suppress_prompts=True)
         
         # Test setting and getting API keys
         config.set_api_key("test_provider", "test_key")
@@ -135,8 +135,8 @@ class Test2DO(unittest.TestCase):
         git_repo.mkdir()
         (git_repo / ".git").mkdir()
         
-        # Test ConfigManager with git repo
-        config = ConfigManager(str(git_repo))
+        # Test ConfigManager with git repo (suppress prompts for testing)
+        config = ConfigManager(str(git_repo), suppress_prompts=True)
         self.assertTrue(config.is_local_project)
         self.assertTrue(str(config.config_dir).endswith("2DO"))
         
@@ -144,7 +144,7 @@ class Test2DO(unittest.TestCase):
         non_git_repo = Path(self.temp_dir) / "non_git"
         non_git_repo.mkdir()
         
-        config2 = ConfigManager(str(non_git_repo))
+        config2 = ConfigManager(str(non_git_repo), suppress_prompts=True)
         self.assertFalse(config2.is_local_project)
         self.assertFalse(str(config2.config_dir).endswith("2DO"))
     
