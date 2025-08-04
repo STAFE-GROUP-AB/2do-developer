@@ -310,11 +310,15 @@ class SetupGuide:
             self.console.print(Panel(
                 "🎉 Congratulations! Your 2DO setup is complete!\n\n"
                 "You can now:\n"
-                "• Run 'ȟdo start' to begin an interactive session\n"
+                "• Run '2do start' to begin an interactive session\n"
                 "• Create and manage todos\n"
                 "• Use AI-powered multitasking\n"
                 "• Work with GitHub issues\n"
-                "• Analyze tech stacks automatically",
+                "• Analyze tech stacks automatically\n\n"
+                "🤖 AI Model Management:\n"
+                "• Run '2do ai-list' to see available AI models\n"
+                "• Run '2do add-ai' to add more AI providers\n"
+                "• Only free models are enabled by default",
                 title="Setup Complete!",
                 style="bold green"
             ))
@@ -325,7 +329,8 @@ class SetupGuide:
                 f"⚠️ Setup is {status['configuration_percentage']:.0f}% complete.\n\n"
                 f"You have {configured_count}/3 services configured.\n"
                 "You can still use 2DO with the configured services.\n\n"
-                "To complete setup, run: 2do setup",
+                "To complete setup, run: 2do setup\n"
+                "To add more AI models, run: 2do add-ai",
                 title="Partial Setup",
                 style="yellow"
             ))

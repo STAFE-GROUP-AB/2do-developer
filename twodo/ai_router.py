@@ -6,11 +6,14 @@ import asyncio
 import json
 from typing import Dict, List, Optional
 from dataclasses import dataclass
-import openai
-import anthropic
+
 from rich.console import Console
 from .config import ConfigManager
 from .mcp_client import MCPClient
+
+# Import AI clients
+import openai
+import anthropic
 
 # Conditional import for Google Generative AI
 try:
@@ -30,6 +33,8 @@ class ModelCapability:
     context_length: int
     cost_per_token: float
     speed_rating: int  # 1-10, 10 being fastest
+    is_free: bool = False  # Whether this model is free to use
+    requires_api_key: bool = True  # Whether this model requires an API key
 
 class AIRouter:
     """Routes prompts to the most suitable AI model"""
@@ -47,16 +52,20 @@ class AIRouter:
         """Initialize available models with their capabilities"""
         models = {}
         
+        # Check if we should load only free models by default
+        load_only_free = self.config.get_preference("load_only_free_models", True)
+        
         # OpenAI models
         if self.config.get_api_key("openai"):
-            models.update({
+            all_openai_models = {
                 "gpt-4o": ModelCapability(
                     name="gpt-4o",
                     provider="openai",
                     strengths=["reasoning", "complex_tasks", "code_analysis", "multimodal", "general"],
                     context_length=128000,
                     cost_per_token=0.005,
-                    speed_rating=8
+                    speed_rating=8,
+                    is_free=False
                 ),
                 "gpt-4o-mini": ModelCapability(
                     name="gpt-4o-mini",
@@ -64,7 +73,8 @@ class AIRouter:
                     strengths=["speed", "general", "simple_tasks", "cost_effective"],
                     context_length=128000,
                     cost_per_token=0.0002,
-                    speed_rating=9
+                    speed_rating=9,
+                    is_free=True  # Free tier available
                 ),
                 "gpt-4": ModelCapability(
                     name="gpt-4",
@@ -72,7 +82,8 @@ class AIRouter:
                     strengths=["reasoning", "complex_tasks", "code_analysis", "general"],
                     context_length=8192,
                     cost_per_token=0.03,
-                    speed_rating=6
+                    speed_rating=6,
+                    is_free=False
                 ),
                 "gpt-3.5-turbo": ModelCapability(
                     name="gpt-3.5-turbo",
@@ -80,7 +91,8 @@ class AIRouter:
                     strengths=["speed", "general", "simple_tasks"],
                     context_length=4096,
                     cost_per_token=0.002,
-                    speed_rating=9
+                    speed_rating=9,
+                    is_free=True  # Free tier available
                 ),
                 "gpt-4-turbo": ModelCapability(
                     name="gpt-4-turbo",
@@ -88,20 +100,27 @@ class AIRouter:
                     strengths=["code", "reasoning", "large_context", "analysis"],
                     context_length=128000,
                     cost_per_token=0.01,
-                    speed_rating=7
+                    speed_rating=7,
+                    is_free=False
                 )
-            })
+            }
+            
+            # Add OpenAI models based on preference
+            for name, model in all_openai_models.items():
+                if not load_only_free or model.is_free:
+                    models[name] = model
         
         # Anthropic models
         if self.config.get_api_key("anthropic"):
-            models.update({
+            all_anthropic_models = {
                 "claude-opus-4-20250514": ModelCapability(
                     name="claude-opus-4-20250514",
                     provider="anthropic",
                     strengths=["reasoning", "creative", "complex_analysis", "research", "writing"],
                     context_length=200000,
                     cost_per_token=0.015,
-                    speed_rating=6
+                    speed_rating=6,
+                    is_free=False
                 ),
                 "claude-sonnet-4-20250514": ModelCapability(
                     name="claude-sonnet-4-20250514",
@@ -109,7 +128,8 @@ class AIRouter:
                     strengths=["reasoning", "code", "balanced", "general", "analysis"],
                     context_length=200000,
                     cost_per_token=0.003,
-                    speed_rating=8
+                    speed_rating=8,
+                    is_free=False
                 ),
                 "claude-3-7-sonnet-20250219": ModelCapability(
                     name="claude-3-7-sonnet-20250219",
@@ -117,7 +137,8 @@ class AIRouter:
                     strengths=["reasoning", "code", "balanced", "general"],
                     context_length=200000,
                     cost_per_token=0.003,
-                    speed_rating=8
+                    speed_rating=8,
+                    is_free=False
                 ),
                 "claude-3-5-sonnet-20241022": ModelCapability(
                     name="claude-3-5-sonnet-20241022",
@@ -125,7 +146,8 @@ class AIRouter:
                     strengths=["reasoning", "creative", "complex_analysis", "code", "balanced"],
                     context_length=200000,
                     cost_per_token=0.003,
-                    speed_rating=8
+                    speed_rating=8,
+                    is_free=False
                 ),
                 "claude-3-5-haiku-20241022": ModelCapability(
                     name="claude-3-5-haiku-20241022",
@@ -133,7 +155,8 @@ class AIRouter:
                     strengths=["speed", "simple_tasks", "quick_answers"],
                     context_length=200000,
                     cost_per_token=0.00025,
-                    speed_rating=10
+                    speed_rating=10,
+                    is_free=True  # Has free tier
                 ),
                 "claude-3-opus-20240229": ModelCapability(
                     name="claude-3-opus-20240229",
@@ -141,20 +164,27 @@ class AIRouter:
                     strengths=["reasoning", "creative", "complex_analysis"],
                     context_length=200000,
                     cost_per_token=0.015,
-                    speed_rating=5
+                    speed_rating=5,
+                    is_free=False
                 )
-            })
+            }
+            
+            # Add Anthropic models based on preference
+            for name, model in all_anthropic_models.items():
+                if not load_only_free or model.is_free:
+                    models[name] = model
         
         # Google Gemini models
         if GOOGLE_AI_AVAILABLE and self.config.get_api_key("google"):
-            models.update({
+            all_google_models = {
                 "gemini-1.5-pro": ModelCapability(
                     name="gemini-1.5-pro",
                     provider="google",
                     strengths=["reasoning", "complex_tasks", "multimodal", "large_context", "analysis"],
                     context_length=2000000,  # 2M tokens
                     cost_per_token=0.0035,
-                    speed_rating=7
+                    speed_rating=7,
+                    is_free=False
                 ),
                 "gemini-1.5-flash": ModelCapability(
                     name="gemini-1.5-flash",
@@ -162,7 +192,8 @@ class AIRouter:
                     strengths=["speed", "general", "multimodal", "balanced"],
                     context_length=1000000,  # 1M tokens
                     cost_per_token=0.00015,
-                    speed_rating=9
+                    speed_rating=9,
+                    is_free=True  # Has free tier
                 ),
                 "gemini-1.0-pro": ModelCapability(
                     name="gemini-1.0-pro",
@@ -170,11 +201,129 @@ class AIRouter:
                     strengths=["general", "reasoning", "balanced"],
                     context_length=32000,
                     cost_per_token=0.0005,
-                    speed_rating=8
+                    speed_rating=8,
+                    is_free=True  # Has free tier
                 )
-            })
+            }
+            
+            # Add Google models based on preference
+            for name, model in all_google_models.items():
+                if not load_only_free or model.is_free:
+                    models[name] = model
+        
+        # Add placeholder models for other providers (will be implemented as providers become available)
+        # These models are shown in ai-list but need actual API implementation
+        self._add_placeholder_models(models, load_only_free)
         
         return models
+    
+    def _add_placeholder_models(self, models: Dict[str, ModelCapability], load_only_free: bool):
+        """Add placeholder models for providers that have API keys but no full implementation yet"""
+        
+        # xAI models (Grok)
+        if self.config.get_api_key("xai"):
+            xai_models = {
+                "grok-4": ModelCapability(
+                    name="grok-4", 
+                    provider="xai",
+                    strengths=["reasoning", "general", "conversational"],
+                    context_length=32000,
+                    cost_per_token=0.01,
+                    speed_rating=7,
+                    is_free=False
+                )
+            }
+            
+            for name, model in xai_models.items():
+                if not load_only_free or model.is_free:
+                    models[name] = model
+        
+        # DeepSeek models
+        if self.config.get_api_key("deepseek"):
+            deepseek_models = {
+                "deepseek-v3": ModelCapability(
+                    name="deepseek-v3",
+                    provider="deepseek", 
+                    strengths=["code", "reasoning", "analysis"],
+                    context_length=64000,
+                    cost_per_token=0.002,
+                    speed_rating=6,
+                    is_free=False
+                ),
+                "deepseek-r1": ModelCapability(
+                    name="deepseek-r1",
+                    provider="deepseek",
+                    strengths=["reasoning", "analysis", "research"],
+                    context_length=64000,
+                    cost_per_token=0.003,
+                    speed_rating=5,
+                    is_free=False
+                )
+            }
+            
+            for name, model in deepseek_models.items():
+                if not load_only_free or model.is_free:
+                    models[name] = model
+        
+        # Mistral models
+        if self.config.get_api_key("mistral"):
+            mistral_models = {
+                "mistral-large-2": ModelCapability(
+                    name="mistral-large-2",
+                    provider="mistral",
+                    strengths=["reasoning", "code", "general", "multilingual"],
+                    context_length=128000,
+                    cost_per_token=0.006,
+                    speed_rating=7,
+                    is_free=False
+                )
+            }
+            
+            for name, model in mistral_models.items():
+                if not load_only_free or model.is_free:
+                    models[name] = model
+        
+        # Cohere models
+        if self.config.get_api_key("cohere"):
+            cohere_models = {
+                "command-r-plus": ModelCapability(
+                    name="command-r-plus",
+                    provider="cohere",
+                    strengths=["general", "reasoning", "commands", "retrieval"],
+                    context_length=128000,
+                    cost_per_token=0.005,
+                    speed_rating=6,
+                    is_free=False
+                )
+            }
+            
+            for name, model in cohere_models.items():
+                if not load_only_free or model.is_free:
+                    models[name] = model
+        
+        # Perplexity models
+        if self.config.get_api_key("perplexity"):
+            perplexity_models = {
+                "pplx-70b-online": ModelCapability(
+                    name="pplx-70b-online",
+                    provider="perplexity",
+                    strengths=["search", "general", "realtime", "web_access"],
+                    context_length=4000,
+                    cost_per_token=0.001,
+                    speed_rating=8,
+                    is_free=False
+                )
+            }
+            
+            for name, model in perplexity_models.items():
+                if not load_only_free or model.is_free:
+                    models[name] = model
+    
+    def enable_all_models(self):
+        """Enable all available models (including paid ones)"""
+        self.config.set_preference("load_only_free_models", False)
+        self.models = self._initialize_models()
+        console.print("✅ All models enabled! Use 'ai-list' to see available models.")
     
     def _setup_clients(self):
         """Setup API clients for each provider"""
@@ -374,8 +523,59 @@ REMEMBER: You have real file system access - USE IT!
             return self._process_anthropic(model_name, prompt)
         elif model.provider == "google":
             return self._process_google(model_name, prompt)
+        elif model.provider in ["xai", "deepseek", "mistral", "cohere", "perplexity"]:
+            return self._process_placeholder_provider(model.provider, model_name, prompt)
         else:
             raise ValueError(f"Unsupported provider: {model.provider}")
+    
+    def _process_placeholder_provider(self, provider: str, model_name: str, prompt: str) -> str:
+        """Handle providers that are configured but not yet fully implemented"""
+        provider_info = {
+            "xai": {
+                "name": "xAI (Grok)",
+                "api_docs": "https://docs.x.ai/api",
+                "note": "xAI API implementation pending. Please check their documentation for the latest API details."
+            },
+            "deepseek": {
+                "name": "DeepSeek",
+                "api_docs": "https://platform.deepseek.com/docs",
+                "note": "DeepSeek API implementation pending. Please check their documentation for the latest API details."
+            },
+            "mistral": {
+                "name": "Mistral AI",
+                "api_docs": "https://docs.mistral.ai/api/",
+                "note": "Mistral API implementation pending. Please check their documentation for the latest API details."
+            },
+            "cohere": {
+                "name": "Cohere",
+                "api_docs": "https://docs.cohere.com/docs/the-cohere-platform",
+                "note": "Cohere API implementation pending. Please check their documentation for the latest API details."
+            },
+            "perplexity": {
+                "name": "Perplexity",
+                "api_docs": "https://docs.perplexity.ai/",
+                "note": "Perplexity API implementation pending. Please check their documentation for the latest API details."
+            }
+        }
+        
+        info = provider_info.get(provider, {
+            "name": provider.title(),
+            "api_docs": "N/A",
+            "note": f"{provider} API implementation pending."
+        })
+        
+        return f"""🚧 **{info['name']} Model Not Yet Implemented**
+
+The model '{model_name}' from {info['name']} is configured but the API integration is not yet implemented.
+
+**Next Steps:**
+1. Check the provider's API documentation: {info['api_docs']}
+2. The model configuration is saved and ready to use once implemented
+3. Consider using an alternative model from OpenAI, Anthropic, or Google for now
+
+**Your Prompt:** {prompt[:200]}{"..." if len(prompt) > 200 else ""}
+
+**Note:** {info['note']}"""
     
     def _process_openai(self, model_name: str, prompt: str) -> str:
         """Process prompt using OpenAI model with filesystem tools"""
