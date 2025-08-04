@@ -104,7 +104,8 @@ class ConfigManager:
                 "analysis": {
                     "last_analyzed": None,
                     "tech_stack": [],
-                    "memory_files_created": False
+                    "memory_files_created": False,
+                    "analysis_completed": False
                 }
             }
             self._save_config()
@@ -285,18 +286,23 @@ class ConfigManager:
         """Check if repository has been analyzed recently"""
         analysis_config = self.config.get("analysis", {})
         last_analyzed = analysis_config.get("last_analyzed")
-        memory_files_created = analysis_config.get("memory_files_created", False)
+        analysis_completed = analysis_config.get("analysis_completed", False)
         
         # If never analyzed, return False
-        if not last_analyzed or not memory_files_created:
+        if not last_analyzed:
             return False
             
-        # Check if memory files still exist
-        if hasattr(self, 'memory_dir'):
-            memory_dir = self.config_dir / "memory"
-        else:
-            memory_dir = self.config_dir / "memory"
+        # Check if analysis was completed (new field takes precedence)
+        if "analysis_completed" in analysis_config:
+            return analysis_completed
             
+        # Backward compatibility: check memory files if no analysis_completed field
+        memory_files_created = analysis_config.get("memory_files_created", False)
+        if not memory_files_created:
+            return False
+            
+        # Check if memory files still exist for backward compatibility
+        memory_dir = self.config_dir / "memory"
         if not memory_dir.exists():
             return False
             
@@ -318,6 +324,7 @@ class ConfigManager:
         self.config["analysis"]["last_analyzed"] = datetime.datetime.now().isoformat()
         self.config["analysis"]["tech_stack"] = tech_stack
         self.config["analysis"]["memory_files_created"] = memory_files_created
+        self.config["analysis"]["analysis_completed"] = True  # New field to track completion
         self._save_config()
     
     def should_skip_analysis(self, force_reanalyze: bool = False) -> bool:
@@ -325,3 +332,20 @@ class ConfigManager:
         if force_reanalyze:
             return False
         return self.has_been_analyzed()
+    
+    def has_memory_files(self) -> bool:
+        """Check if memory files exist for the last analysis"""
+        analysis_config = self.config.get("analysis", {})
+        memory_files_created = analysis_config.get("memory_files_created", False)
+        
+        if not memory_files_created:
+            return False
+            
+        # Check if memory files still exist
+        memory_dir = self.config_dir / "memory"
+        if not memory_dir.exists():
+            return False
+            
+        # Check if we have at least one memory file
+        memory_files = list(memory_dir.glob("*_context.json"))
+        return len(memory_files) > 0
