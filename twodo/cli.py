@@ -241,6 +241,20 @@ def start(repo, force_analyze):
         console.print("✅ GitHub connection established")
     
     ai_router = AIRouter(config_manager)
+    
+    # Initialize MCP filesystem server for file operations
+    console.print("🔌 Initializing filesystem server for file operations...")
+    try:
+        import asyncio
+        filesystem_success = asyncio.run(ai_router.initialize_filesystem(working_dir))
+        if filesystem_success:
+            console.print("✅ Filesystem server initialized - AI can now modify files locally!")
+        else:
+            console.print("⚠️ Filesystem server initialization failed - AI will provide suggestions only")
+    except Exception as e:
+        console.print(f"⚠️ Filesystem server setup error: {e}")
+        console.print("💡 AI will provide suggestions only. Install Node.js and npm for file operations.")
+    
     todo_manager = TodoManager(config_manager.config_dir)
     multitasker = Multitasker(ai_router, todo_manager)
     tech_detector = TechStackDetector(config_manager.config_dir)

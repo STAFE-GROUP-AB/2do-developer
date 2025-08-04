@@ -3,12 +3,12 @@ AI Router - Intelligent routing of prompts to the best AI model
 """
 
 import asyncio
-import re
+import json
 from typing import Dict, List, Optional
-from dataclasses import dataclass
-import openai
-import anthropic
 from rich.console import Console
+from .config import ConfigManager
+from .models import ModelConfig
+from .mcp_client import MCPClient
 
 # Conditional import for Google Generative AI
 try:
@@ -38,6 +38,8 @@ class AIRouter:
         self.developer_context = ""
         self._setup_clients()
         self.last_selected_model = None
+        self.mcp_client = MCPClient(config_manager)
+        self.filesystem_initialized = False
     
     def _initialize_models(self) -> Dict[str, ModelCapability]:
         """Initialize available models with their capabilities"""
@@ -281,8 +283,16 @@ class AIRouter:
         return best_model
     
     def set_developer_context(self, context: str):
-        """Set the developer context for all AI interactions"""
+        """Set developer context for enhanced prompts"""
         self.developer_context = context
+    
+    async def initialize_filesystem(self, project_path: str = None):
+        """Initialize MCP filesystem server for file operations"""
+        if not self.filesystem_initialized:
+            success = await self.mcp_client.initialize_filesystem_server(project_path)
+            self.filesystem_initialized = success
+            return success
+        return True
     
     def route_and_process(self, prompt: str, todo_context: str = None) -> str:
         """Route prompt to best model and process it"""
@@ -329,17 +339,39 @@ class AIRouter:
             raise ValueError(f"Unsupported provider: {model.provider}")
     
     def _process_openai(self, model_name: str, prompt: str) -> str:
-        """Process prompt using OpenAI model"""
+        """Process prompt using OpenAI model with filesystem tools"""
         try:
             client = self.clients["openai"]
             
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7
-            )
+            # Prepare messages
+            messages = [{"role": "user", "content": prompt}]
             
-            return response.choices[0].message.content
+            # Add filesystem tools if available
+            tools = None
+            if self.filesystem_initialized:
+                tools = self.mcp_client.get_filesystem_tools_for_openai()
+            
+            # Create completion with or without tools
+            if tools:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice="auto",
+                    temperature=0.7
+                )
+                
+                # Handle tool calls
+                return asyncio.run(self._handle_openai_tool_calls(response, messages, client, model_name))
+            else:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.7
+                )
+                
+                return response.choices[0].message.content
+                
         except Exception as e:
             error_msg = str(e)
             if "404" in error_msg or "model" in error_msg.lower() and "not found" in error_msg.lower():
@@ -350,6 +382,62 @@ class AIRouter:
                 raise ValueError(f"Rate limit exceeded for OpenAI API")
             else:
                 raise ValueError(f"OpenAI API error: {error_msg}")
+    
+    async def _handle_openai_tool_calls(self, response, messages, client, model_name):
+        """Handle OpenAI tool calls for filesystem operations"""
+        message = response.choices[0].message
+        
+        # If no tool calls, return the message content
+        if not message.tool_calls:
+            return message.content or "No response generated"
+        
+        # Add the assistant's message to conversation
+        messages.append(message)
+        
+        # Process each tool call
+        for tool_call in message.tool_calls:
+            function_name = tool_call.function.name
+            function_args = json.loads(tool_call.function.arguments)
+            
+            console.print(f"🔧 Calling {function_name} with args: {function_args}")
+            
+            try:
+                # Call the filesystem tool through MCP client
+                result = await self.mcp_client.call_filesystem_tool(function_name, function_args)
+                
+                # Add tool result to messages
+                messages.append({
+                    "tool_call_id": tool_call.id,
+                    "role": "tool",
+                    "name": function_name,
+                    "content": result
+                })
+                
+            except Exception as e:
+                error_result = f"Error executing {function_name}: {str(e)}"
+                console.print(f"❌ {error_result}")
+                
+                messages.append({
+                    "tool_call_id": tool_call.id,
+                    "role": "tool", 
+                    "name": function_name,
+                    "content": error_result
+                })
+        
+        # Get final response after tool execution
+        final_response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            temperature=0.7
+        )
+        
+        return final_response.choices[0].message.content
+    
+    async def cleanup(self):
+        """Clean up MCP client resources"""
+        if self.mcp_client:
+            await self.mcp_client.cleanup()
+            self.filesystem_initialized = False
     
     def _process_anthropic(self, model_name: str, prompt: str) -> str:
         """Process prompt using Anthropic model"""
