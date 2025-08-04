@@ -23,6 +23,7 @@ from .markdown_parser import MarkdownTaskParser
 from .github_integration import GitHubIntegration
 from .browser_integration import BrowserIntegration
 from .image_handler import ImageHandler
+from .intent_router import IntentRouter
 
 from .setup_guide import SetupGuide
 from .mcp_manager import MCPServerManager
@@ -230,6 +231,7 @@ def start(repo):
     github_integration = GitHubIntegration(config_manager.get_api_key("github"))
     browser_integration = BrowserIntegration(working_dir)
     image_handler = ImageHandler()
+    intent_router = IntentRouter()
     
     # Get repository info if we're in a git repo
     repo_info = None
@@ -250,30 +252,42 @@ def start(repo):
             tech_detector.create_memory_files(tech_stack)
             console.print("💾 Memory files created")
     
-    # Interactive session
+    # Interactive session with natural language interface
+    console.print("\n🤖 Welcome to 2DO - Your AI-powered development companion!")
+    console.print("💡 Just tell me what you'd like to do in natural language, or type 'help' for guidance")
+    
+    # Add developer-focused context to AI router
+    ai_router.set_developer_context(intent_router.get_developer_context_prompt())
+    
     while True:
         console.print("\n" + "="*50)
-        choices = ["add-todo", "list-todos", "create-subtasks", "start-multitask", "parse-markdown", "manage-mcp", "chat", "quit"]
         
-        # Add browser options
-        browser_status = browser_integration.get_status()
-        if browser_status["active"]:
-            choices.insert(-2, "refresh-browser")  # Before chat and quit
-            choices.insert(-2, "stop-browser")
-        else:
-            choices.insert(-2, "start-browser")
-        
-        # Add GitHub options if we have repository info
-        if repo_info and github_integration.github:
-            choices.insert(-3, "github-issues")  # Before browser and chat/quit
-            choices.insert(-3, "create-github-issue")
-            choices.insert(-3, "export-todos-to-github")
-        
-        action = Prompt.ask(
-            "What would you like to do?",
-            choices=choices,
-            default="chat"
+        # Natural language prompt instead of explicit choices
+        user_input = Prompt.ask(
+            "[bold cyan]What can 2do help you with?[/bold cyan]",
+            default=""
         )
+        
+        if not user_input.strip():
+            console.print("💡 Try telling me what you'd like to work on, like:")
+            console.print("   • 'Add a todo for fixing the login bug'")
+            console.print("   • 'Show me my current tasks'") 
+            console.print("   • 'Help me work on GitHub issues'")
+            console.print("   • 'I need to implement user authentication'")
+            continue
+        
+        # Handle special commands
+        if user_input.lower().strip() in ["help", "?", "commands"]:
+            show_natural_language_help()
+            continue
+        
+        # Analyze intent
+        intent_match = intent_router.analyze_intent(user_input)
+        action = intent_match.intent
+        
+        # Show friendly confirmation
+        confirmation = intent_router.get_friendly_confirmation(action, intent_match.extracted_params)
+        console.print(f"\n{confirmation}")
         
         if action == "quit":
             # Clean up browser integration before quitting
@@ -281,32 +295,31 @@ def start(repo):
                 browser_integration.stop_browser_mode()
             break
         elif action == "add-todo":
-            handle_add_todo(todo_manager, ai_router, image_handler)
+            handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params)
         elif action == "list-todos":
             handle_list_todos(todo_manager)
         elif action == "create-subtasks":
             handle_create_subtasks(todo_manager, ai_router)
-        elif action == "start-multitask":
+        elif action == "multitask":
             handle_multitask(multitasker, todo_manager, browser_integration)
         elif action == "parse-markdown":
             handle_parse_markdown(todo_manager, working_dir)
-        elif action == "manage-mcp":
+        elif action == "mcp-management":
             handle_manage_mcp(config_manager, working_dir)
-        elif action == "start-browser":
-            handle_start_browser(browser_integration)
-        elif action == "refresh-browser":
-            handle_refresh_browser(browser_integration)
-        elif action == "stop-browser":
-            handle_stop_browser(browser_integration)
+        elif action == "browser-integration":
+            handle_browser_integration_natural(browser_integration, user_input)
         elif action == "github-issues":
             handle_github_issues(github_integration, todo_manager, repo_info, working_dir)
         elif action == "create-github-issue":
-            handle_create_github_issue(github_integration, repo_info)
+            handle_create_github_issue_natural(github_integration, repo_info, user_input, intent_match.extracted_params)
         elif action == "export-todos-to-github":
             if repo_info and github_integration.github:
                 handle_export_todos_to_github(github_integration, todo_manager, repo_info)
         elif action == "chat":
-            handle_chat(ai_router, image_handler)
+            handle_chat_natural(ai_router, image_handler, user_input)
+        else:
+            # Fallback to chat for unrecognized intents
+            handle_chat_natural(ai_router, image_handler, user_input)
 
 @cli.command()
 @click.option('--project', '-p', help='Project directory to analyze (default: current directory)')
@@ -979,6 +992,237 @@ def handle_create_subtasks(todo_manager, ai_router):
                 console.print(f"   {i}. {sub_task['title']}")
     else:
         console.print("❌ Failed to create sub-tasks")
+
+
+def show_natural_language_help():
+    """Display help for the natural language interface"""
+    console.print("\n🎯 2DO Natural Language Help")
+    console.print("=" * 50)
+    
+    console.print("\n💬 Just tell me what you want to do! Here are some examples:")
+    
+    console.print("\n📝 [bold]Managing Todos:[/bold]")
+    console.print("   • 'Add a todo for fixing the login bug'")
+    console.print("   • 'Create a task to implement user authentication'")
+    console.print("   • 'I need to debug the payment system'")
+    console.print("   • 'Show me my current tasks'")
+    console.print("   • 'What am I working on?'")
+    console.print("   • 'Break down my complex task into smaller pieces'")
+    
+    console.print("\n🐙 [bold]GitHub Integration:[/bold]")
+    console.print("   • 'Show me GitHub issues'")
+    console.print("   • 'Create a GitHub issue for the API bug'")
+    console.print("   • 'Export my todos to GitHub'")
+    console.print("   • 'Sync with repository issues'")
+    
+    console.print("\n🌐 [bold]Development Tools:[/bold]")
+    console.print("   • 'Start browser integration'")
+    console.print("   • 'Parse markdown files for tasks'")
+    console.print("   • 'Manage MCP servers'")
+    console.print("   • 'Run multitask on all todos'")
+    
+    console.print("\n💡 [bold]Getting Help:[/bold]")
+    console.print("   • 'How do I implement OAuth?'")
+    console.print("   • 'Help me with React state management'")
+    console.print("   • 'Explain database indexing'")
+    console.print("   • 'What's the best way to handle errors?'")
+    
+    console.print("\n🚪 [bold]Exiting:[/bold]")
+    console.print("   • 'quit', 'exit', 'bye', 'done'")
+    
+    console.print("\n🤖 Remember: I'm here to help make your development workflow faster and more enjoyable!")
+    console.print("=" * 50)
+
+def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, extracted_params):
+    """Handle adding a todo from natural language input"""
+    # Use extracted title if available, otherwise prompt
+    if extracted_params and "suggested_title" in extracted_params:
+        suggested_title = extracted_params["suggested_title"]
+        title = Prompt.ask("Todo title", default=suggested_title)
+    else:
+        # Use AI to suggest a title based on user input
+        ai_suggestion = ai_router.route_and_process(
+            f"Based on this request: '{user_input}', suggest a concise todo title (max 60 characters). "
+            f"Just return the title, nothing else."
+        )
+        title = Prompt.ask("Todo title", default=ai_suggestion.strip())
+    
+    description = Prompt.ask("Description (optional)", default="")
+    
+    # Smart type detection based on content
+    todo_type = "general"
+    user_input_lower = user_input.lower()
+    if any(word in user_input_lower for word in ["code", "debug", "implement", "fix", "build", "deploy"]):
+        todo_type = "code"
+    elif any(word in user_input_lower for word in ["write", "document", "readme", "docs"]):
+        todo_type = "text"
+    
+    todo_type = Prompt.ask(
+        "Todo type",
+        choices=["code", "text", "image", "general"],
+        default=todo_type
+    )
+    
+    # Smart priority detection
+    priority = "medium"
+    if any(word in user_input_lower for word in ["urgent", "critical", "asap", "important", "high"]):
+        priority = "high"
+    elif any(word in user_input_lower for word in ["minor", "low", "later", "someday"]):
+        priority = "low"
+    elif any(word in user_input_lower for word in ["critical", "emergency", "broken", "down"]):
+        priority = "critical"
+    
+    priority = Prompt.ask(
+        "Priority",
+        choices=["low", "medium", "high", "critical"],
+        default=priority
+    )
+    
+    # Handle content input
+    content = None
+    if todo_type in ["code", "text"]:
+        if Confirm.ask("Do you want to paste content now?"):
+            console.print("Enter content (Ctrl+D to finish):")
+            lines = []
+            try:
+                while True:
+                    line = input()
+                    lines.append(line)
+            except EOFError:
+                content = "\n".join(lines)
+    elif todo_type == "image":
+        clipboard_image_path = image_handler.prompt_for_clipboard_image()
+        if clipboard_image_path:
+            content = clipboard_image_path
+        else:
+            file_path = Prompt.ask("Enter path to image file (optional)", default="")
+            if file_path and os.path.exists(file_path):
+                content = file_path
+    
+    todo_id = todo_manager.add_todo(title, description, todo_type, priority, content)
+    console.print("✅ Todo added successfully!")
+    
+    # Auto-suggest sub-task breakdown for complex todos
+    todo = todo_manager.get_todo_by_id(todo_id)
+    if todo and todo_manager.is_todo_too_large(todo):
+        console.print("🔍 This todo looks pretty complex!")
+        if Confirm.ask("Want me to break it down into smaller, manageable sub-tasks?"):
+            sub_task_ids = todo_manager.create_sub_tasks_from_todo(todo_id, ai_router)
+            if sub_task_ids:
+                console.print(f"🎯 Created {len(sub_task_ids)} sub-tasks to help you tackle this step by step!")
+                console.print("💡 Use 'show me my tasks' to see the breakdown.")
+
+def handle_create_github_issue_natural(github_integration, repo_info, user_input, extracted_params):
+    """Handle creating GitHub issue from natural language"""
+    if not repo_info:
+        console.print("❌ No GitHub repository information available")
+        return
+    
+    # Use extracted title if available
+    if extracted_params and "suggested_title" in extracted_params:
+        suggested_title = extracted_params["suggested_title"]
+        title = Prompt.ask("Issue title", default=suggested_title)
+    else:
+        title = Prompt.ask("Issue title")
+    
+    body = Prompt.ask("Issue description (optional)", default="")
+    
+    # Smart label suggestions based on user input
+    suggested_labels = []
+    user_input_lower = user_input.lower()
+    if any(word in user_input_lower for word in ["bug", "error", "broken", "issue", "problem"]):
+        suggested_labels.append("bug")
+    if any(word in user_input_lower for word in ["feature", "enhancement", "new", "add"]):
+        suggested_labels.append("enhancement")
+    if any(word in user_input_lower for word in ["doc", "documentation", "readme"]):
+        suggested_labels.append("documentation")
+    
+    labels_input = Prompt.ask(
+        "Labels (comma-separated, optional)", 
+        default=",".join(suggested_labels) if suggested_labels else ""
+    )
+    labels = [label.strip() for label in labels_input.split(",") if label.strip()]
+    
+    issue_info = github_integration.create_issue(
+        repo_info['owner'], repo_info['repo_name'], title, body, labels
+    )
+    
+    if issue_info:
+        console.print(f"🎉 Successfully created issue #{issue_info['number']}: {issue_info['url']}")
+        console.print("🚀 Time to tackle that problem!")
+    else:
+        console.print("❌ Failed to create issue - check your GitHub configuration")
+
+def handle_browser_integration_natural(browser_integration, user_input):
+    """Handle browser integration from natural language"""
+    user_input_lower = user_input.lower()
+    
+    if any(word in user_input_lower for word in ["start", "open", "launch", "begin"]):
+        handle_start_browser(browser_integration)
+    elif any(word in user_input_lower for word in ["refresh", "reload", "update"]):
+        handle_refresh_browser(browser_integration)
+    elif any(word in user_input_lower for word in ["stop", "close", "end"]):
+        handle_stop_browser(browser_integration)
+    else:
+        # Show browser status and options
+        browser_status = browser_integration.get_status()
+        if browser_status["active"]:
+            console.print("🌐 Browser integration is currently active!")
+            action = Prompt.ask(
+                "What would you like to do?",
+                choices=["refresh", "stop", "status"],
+                default="status"
+            )
+            if action == "refresh":
+                handle_refresh_browser(browser_integration)
+            elif action == "stop":
+                handle_stop_browser(browser_integration)
+            else:
+                console.print(f"📊 Browser Status: {browser_status}")
+        else:
+            console.print("🌐 Browser integration is not currently running.")
+            if Confirm.ask("Would you like to start it?"):
+                handle_start_browser(browser_integration)
+
+def handle_chat_natural(ai_router, image_handler, user_input):
+    """Handle natural chat - enhanced with developer context"""
+    console.print("💬 Let me help you with that...")
+    
+    # Clean up old temporary files
+    image_handler.cleanup_old_temp_files()
+    
+    # Check for clipboard image
+    clipboard_image_path = None
+    try:
+        image = image_handler.check_clipboard_for_image()
+        if image is not None:
+            console.print("🖼️  I see you have an image in your clipboard!")
+            if Confirm.ask("Should I include this image in my analysis?"):
+                image_handler.display_image_info(image)
+                clipboard_image_path = image_handler.save_image_temporarily(image)
+                console.print(f"✅ Image attached to your question")
+    except Exception:
+        pass  # Silently ignore clipboard errors
+    
+    # Enhance the prompt with developer context
+    enhanced_prompt = f"""As a developer-focused AI assistant, please help with this request: {user_input}
+
+Context: This is from a developer using 2DO, a development productivity tool. Please provide helpful, practical advice that's relevant to software development workflows. Be friendly, encouraging, and add a touch of developer humor when appropriate.
+
+If this is a technical question, provide clear explanations with code examples when relevant. If it's about productivity or workflow, suggest best practices that work well for developers."""
+    
+    if clipboard_image_path:
+        enhanced_prompt += f"\n\n[Image attached: {clipboard_image_path}]"
+    
+    # Route to best AI model with developer context
+    response = ai_router.route_and_process(enhanced_prompt)
+    console.print(f"\n🤖 {response}\n")
+    
+    # Offer follow-up suggestions
+    console.print("💡 Want to do something with this information? Try:")
+    console.print("   • 'Add a todo for implementing this'")
+    console.print("   • 'Create a GitHub issue about this'")
+    console.print("   • 'Show me my current tasks' to see what else you're working on")
 
 
 def main():
