@@ -299,26 +299,36 @@ class AIRouter:
     def _add_file_operation_instructions(self, prompt: str) -> str:
         """Add explicit file operation instructions to prompt when filesystem tools are available"""
         file_operation_context = """
-IMPORTANT: You have access to filesystem tools and can perform real file operations. When the task involves:
-- Creating, updating, or modifying files (like README.md, code files, documentation)
-- Reading file contents for analysis
-- Creating directories or organizing files
+🚨 CRITICAL: You have filesystem tools available and MUST use them for file operations.
 
-You MUST use the available filesystem tools to perform these operations directly. Do NOT just provide suggestions or examples.
+🔧 AVAILABLE TOOLS (use these, don't just talk about them):
+- read_file(path): Read file contents
+- write_file(path, content): Write/update files 
+- create_directory(path): Create directories
+- list_directory(path): List directory contents
 
-Available tools:
-- read_file: Read contents of existing files
-- write_file: Create new files or completely replace existing file contents
-- create_directory: Create new directories
-- list_directory: List contents of directories
+⚡ MANDATORY ACTIONS for file-related tasks:
+- For "update README.md" → CALL write_file("README.md", content)
+- For "read file" → CALL read_file(path)
+- For "create file" → CALL write_file(path, content)
+- For "analyze repository" → CALL list_directory(".") then read relevant files
 
-For tasks like "update README.md" or "create documentation", you should:
-1. First read the existing file (if it exists) using read_file
-2. Analyze the current content and requirements
-3. Use write_file to create or update the file with the new content
-4. Confirm the operation was successful
+❌ DO NOT:
+- Display code examples like ```python write_file(...)```
+- Suggest what should be done
+- Show mock code blocks
 
-Always perform the actual file operations - do not just suggest what should be done.
+✅ DO:
+- Actually call the tools to perform file operations
+- Use the tools immediately when file tasks are requested
+- Perform real file modifications, not suggestions
+
+🎯 EXAMPLE: If asked to "update README.md", you should:
+1. CALL read_file("README.md") to see current content
+2. CALL write_file("README.md", new_content) to update it
+3. Confirm the file was actually modified
+
+REMEMBER: You have real file system access - USE IT!
 """
         
         return f"{file_operation_context}\n\nUser Request: {prompt}"
