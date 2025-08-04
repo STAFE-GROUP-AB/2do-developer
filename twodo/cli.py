@@ -472,7 +472,7 @@ def update(check_only, force):
                 raise click.ClickException("Update failed")
     except Exception as e:
         console.print(f"❌ Update error: {e}")
-        raise click.ClickException("Update process failed"
+        raise click.ClickException("Update process failed")
 
 def handle_add_todo(todo_manager, ai_router, image_handler):
     """Handle adding a new todo item"""
