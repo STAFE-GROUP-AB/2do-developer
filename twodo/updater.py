@@ -124,6 +124,35 @@ class UpdateManager:
         
         return "unknown"
     
+    def _normalize_version(self, version_string: str) -> str:
+        """Normalize version string by removing common prefixes and cleaning format"""
+        if not version_string:
+            return "0.1.0"
+        
+        # Remove whitespace
+        version_string = version_string.strip()
+        
+        # Handle common version prefixes
+        # Remove 'v' or 'v.' prefix (e.g., 'v1.0.0', 'v.1.0.0')
+        if version_string.startswith('v.'):
+            version_string = version_string[2:]  # Remove 'v.'
+        elif version_string.startswith('v'):
+            version_string = version_string[1:]  # Remove 'v'
+        
+        # Remove any remaining leading dots
+        version_string = version_string.lstrip('.')
+        
+        # Ensure we have a valid version format
+        if not version_string or version_string.startswith('.'):
+            return "0.1.0"
+        
+        # Basic validation - ensure it looks like a version
+        import re
+        if not re.match(r'^\d+(\.\d+)*', version_string):
+            return "0.1.0"
+        
+        return version_string
+    
     def check_for_updates(self) -> Dict:
         """Check if updates are available"""
         console.print("🔍 Checking for updates...")
@@ -147,7 +176,7 @@ class UpdateManager:
             response.raise_for_status()
             
             release_data = response.json()
-            latest_version = release_data['tag_name'].lstrip('v')
+            latest_version = self._normalize_version(release_data['tag_name'])
             
             # Compare versions with error handling
             try:
@@ -160,12 +189,18 @@ class UpdateManager:
                     console.print("⚠️ Warning: Latest version is empty, using current version")
                     latest_version = self.current_version
                 
-                current_ver = version.parse(self.current_version)
-                latest_ver = version.parse(latest_version)
+                # Normalize both versions for comparison
+                normalized_current = self._normalize_version(self.current_version)
+                normalized_latest = self._normalize_version(latest_version)
+                
+                current_ver = version.parse(normalized_current)
+                latest_ver = version.parse(normalized_latest)
                 
                 update_available = latest_ver > current_ver
             except Exception as e:
                 console.print(f"⚠️ Version comparison failed: {e}")
+                console.print(f"📋 Current: '{self.current_version}' -> '{self._normalize_version(self.current_version)}'")
+                console.print(f"📋 Latest: '{release_data['tag_name']}' -> '{latest_version}'")
                 # Default to no update available if version parsing fails
                 update_available = False
             
