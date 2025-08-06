@@ -251,15 +251,38 @@ class UpdateManager:
             with tempfile.TemporaryDirectory() as temp_dir:
                 repo_path = Path(temp_dir) / "2do-developer"
                 
-                # Clone the repository
+                # Clone the repository with explicit latest commit fetch
                 console.print("📥 Downloading latest version...")
                 result = subprocess.run([
-                    "git", "clone", f"https://github.com/{self.repo_owner}/{self.repo_name}.git", str(repo_path)
+                    "git", "clone", "--depth=1", "--branch=main", 
+                    f"https://github.com/{self.repo_owner}/{self.repo_name}.git", str(repo_path)
                 ], capture_output=True, text=True)
                 
                 if result.returncode != 0:
                     console.print(f"❌ Failed to download: {result.stderr}")
                     return False
+                
+                # Verify we have the latest commit with our fix
+                console.print("🔍 Verifying latest code...")
+                git_log_result = subprocess.run([
+                    "git", "log", "--oneline", "-1"
+                ], cwd=str(repo_path), capture_output=True, text=True)
+                
+                if git_log_result.returncode == 0:
+                    latest_commit = git_log_result.stdout.strip()
+                    console.print(f"📋 Installing from commit: {latest_commit}")
+                    
+                    # Check if our critical fix is present
+                    ai_router_path = repo_path / "twodo" / "ai_router.py"
+                    if ai_router_path.exists():
+                        with open(ai_router_path, 'r') as f:
+                            content = f.read()
+                            if "def set_developer_context" in content:
+                                console.print("✅ Critical fix verified in downloaded code")
+                            else:
+                                console.print("⚠️ Warning: Critical fix not found in downloaded code")
+                else:
+                    console.print("⚠️ Could not verify commit information")
                 
                 # Install all dependencies first to ensure nothing is missing
                 console.print("🔧 Installing all dependencies...")
@@ -296,6 +319,24 @@ class UpdateManager:
                 
                 if result.returncode == 0:
                     console.print("✅ Update completed successfully!")
+                    
+                    # Verify the installed package has our critical fix
+                    console.print("🔍 Verifying installed package...")
+                    try:
+                        # Check if the installed ai_router has our fix
+                        installed_ai_router = venv_path / "lib" / "python3.9" / "site-packages" / "twodo" / "ai_router.py"
+                        if installed_ai_router.exists():
+                            with open(installed_ai_router, 'r') as f:
+                                installed_content = f.read()
+                                if "def set_developer_context" in installed_content:
+                                    console.print("✅ Critical fix verified in installed package")
+                                else:
+                                    console.print("❌ CRITICAL: Fix missing in installed package!")
+                                    return False
+                        else:
+                            console.print("⚠️ Could not verify installed package")
+                    except Exception as e:
+                        console.print(f"⚠️ Could not verify installation: {e}")
                     
                     # Ensure wrapper script exists
                     wrapper_path = Path.home() / ".local" / "bin" / "2do"
