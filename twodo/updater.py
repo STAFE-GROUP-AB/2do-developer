@@ -11,7 +11,8 @@ import shutil
 import tempfile
 import platform
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
+from urllib.parse import urlparse
 import requests
 from packaging import version
 from rich.console import Console
@@ -84,7 +85,10 @@ class UpdateManager:
                     content = f.read()
                     # Simple regex to extract version
                     import re
-                    version_match = re.search(r'version\s*=\s*["\']([^"\']*)["\'']', content)
+                    # Try both single and double quotes
+                    version_match = re.search(r'version\s*=\s*"([^"]+)"', content)
+                    if not version_match:
+                        version_match = re.search(r"version\s*=\s*'([^']+)'", content)
                     if version_match:
                         version = version_match.group(1)
                         if version and version.strip():
@@ -499,24 +503,162 @@ class UpdateManager:
         
         return success
     
+    def setup_global_path(self) -> bool:
+        """Ensure 2do is accessible globally by adding to PATH"""
+        try:
+            # Get the 2do binary path
+            twodo_bin = Path.home() / ".2do" / "bin" / "2do"
+            if not twodo_bin.exists():
+                console.print("⚠️ 2do binary not found, skipping PATH setup")
+                return False
+            
+            # Check if already in PATH
+            try:
+                result = subprocess.run(["which", "2do"], capture_output=True, text=True)
+                if result.returncode == 0:
+                    console.print("✅ 2do is already accessible globally")
+                    return True
+            except:
+                pass
+            
+            # Determine OS and setup PATH accordingly
+            system = platform.system().lower()
+            
+            if system in ["darwin", "linux"]:
+                return self._setup_unix_path(twodo_bin)
+            elif system == "windows":
+                return self._setup_windows_path(twodo_bin)
+            else:
+                console.print(f"⚠️ Unsupported OS: {system}")
+                return False
+                
+        except Exception as e:
+            console.print(f"⚠️ Error setting up global PATH: {e}")
+            return False
+    
+    def _setup_unix_path(self, twodo_bin: Path) -> bool:
+        """Setup PATH for macOS and Linux"""
+        try:
+            bin_dir = twodo_bin.parent
+            
+            # Common shell config files
+            shell_configs = [
+                Path.home() / ".bashrc",
+                Path.home() / ".bash_profile", 
+                Path.home() / ".zshrc",
+                Path.home() / ".profile"
+            ]
+            
+            path_line = f'export PATH="{bin_dir}:$PATH"  # Added by 2do installer'
+            
+            # Find existing shell config or create .profile
+            config_file = None
+            for config in shell_configs:
+                if config.exists():
+                    # Check if already added
+                    content = config.read_text()
+                    if str(bin_dir) in content and "2do" in content:
+                        console.print("✅ PATH already configured")
+                        return True
+                    config_file = config
+                    break
+            
+            if not config_file:
+                config_file = Path.home() / ".profile"
+            
+            # Add to shell config
+            with open(config_file, "a") as f:
+                f.write(f"\n{path_line}\n")
+            
+            # Create symlink in /usr/local/bin if possible (common on macOS)
+            local_bin = Path("/usr/local/bin/2do")
+            if not local_bin.exists():
+                try:
+                    local_bin.symlink_to(twodo_bin)
+                    console.print("✅ Created symlink in /usr/local/bin")
+                except (PermissionError, OSError):
+                    pass  # Fallback to shell config only
+            
+            system_name = "macOS" if platform.system() == "Darwin" else "Linux"
+            console.print(Panel(
+                f"🎉 2do has been added to your global PATH on {system_name}!\n\n"
+                f"📝 Added to: {config_file}\n"
+                f"💡 Restart your terminal or run: source {config_file}\n"
+                f"🚀 You can now use '2do' from anywhere!",
+                title="Global PATH Setup Complete",
+                style="green"
+            ))
+            return True
+            
+        except Exception as e:
+            console.print(f"⚠️ Error setting up Unix PATH: {e}")
+            return False
+    
+    def _setup_windows_path(self, twodo_bin: Path) -> bool:
+        """Setup PATH for Windows"""
+        try:
+            bin_dir = str(twodo_bin.parent)
+            
+            # Try to add to user PATH via registry
+            import winreg
+            
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS)
+            try:
+                current_path, _ = winreg.QueryValueEx(key, "PATH")
+            except FileNotFoundError:
+                current_path = ""
+            
+            if bin_dir not in current_path:
+                new_path = f"{current_path};{bin_dir}" if current_path else bin_dir
+                winreg.SetValueEx(key, "PATH", 0, winreg.REG_EXPAND_SZ, new_path)
+                
+                console.print(Panel(
+                    f"🎉 2do has been added to your global PATH on Windows!\n\n"
+                    f"💡 Restart your command prompt or PowerShell\n"
+                    f"🚀 You can now use '2do' from anywhere!",
+                    title="Global PATH Setup Complete",
+                    style="green"
+                ))
+            else:
+                console.print("✅ PATH already configured")
+            
+            winreg.CloseKey(key)
+            return True
+            
+        except ImportError:
+            console.print("⚠️ Windows registry access not available")
+            return False
+        except Exception as e:
+            console.print(f"⚠️ Error setting up Windows PATH: {e}")
+            return False
+    
     def run_update_process(self, force: bool = False) -> bool:
         """Run the complete update process"""
         console.print(Panel.fit("🔄 2DO Update Manager", style="bold blue"))
         
-        # Check for updates
-        update_info = self.check_for_updates()
-        self.display_update_info(update_info)
-        
-        if update_info.get('error') or update_info.get('message'):
-            # No proper releases available, but allow force update
-            if not force:
-                return False
-        
-        if not update_info['update_available'] and not force:
-            return True
-        
         if force:
             console.print("🔄 Force update requested...")
+            console.print("🌿 Using latest code from main branch (development version)")
+            # Skip release check for force updates - go straight to main branch
+            update_info = {
+                'update_available': True,
+                'current_version': self.current_version,
+                'latest_version': 'main-branch',
+                'install_method': self.install_method,
+                'force_main_branch': True
+            }
+        else:
+            console.print("🔍 Checking for updates...")
+            # Check for updates from releases
+            update_info = self.check_for_updates()
+            self.display_update_info(update_info)
+            
+            if update_info.get('error') or update_info.get('message'):
+                # No proper releases available
+                return False
+            
+            if not update_info['update_available']:
+                return True
         
         # Ask for confirmation
         if not force:
@@ -569,6 +711,10 @@ class UpdateManager:
                 title="Update Complete",
                 style="green"
             ))
+            
+            # Setup global PATH access
+            console.print("🔧 Setting up global PATH access...")
+            self.setup_global_path()
             
             # Clean up backup if update was successful
             if backup_path and Path(backup_path).exists():
