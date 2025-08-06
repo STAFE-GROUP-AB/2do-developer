@@ -18,10 +18,10 @@ mcp_servers:
   name: Context7 (Upstash)
   repository: https://github.com/upstash/context7
 - category: essential
-  command: uvx mcp-server-filesystem
-  description: File system operations and management
+  command: npx -y @modelcontextprotocol/server-filesystem
+  description: Official MCP filesystem server with advanced file operations, pattern matching, and security controls
   enabled: true
-  name: Filesystem MCP Server
+  name: Official Filesystem MCP Server
   repository: https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem
 - category: development
   command: uvx mcp-server-git

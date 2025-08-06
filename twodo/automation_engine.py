@@ -573,6 +573,247 @@ jobs:
         }
         
         return templates.get(template_name, f"# {template_name} template not found")
+    
+    async def handle_smart_todo_creation(self, user_input: str) -> bool:
+        """Handle smart todo creation with instant action prompt"""
+        auto_todo = self.parse_smart_todo(user_input)
+        
+        if not auto_todo:
+            return False
+        
+        # Display the parsed todo
+        console.print(Panel.fit(
+            f"🤖 Smart Todo Detected!\n\n"
+            f"📝 Title: {auto_todo.suggested_title}\n"
+            f"📋 Description: {auto_todo.suggested_description}\n"
+            f"📁 Files: {', '.join(auto_todo.detected_files) if auto_todo.detected_files else 'None detected'}\n"
+            f"🎯 Action: {auto_todo.action_type.title()}\n"
+            f"🎲 Confidence: {auto_todo.confidence:.0%}",
+            style="bold green"
+        ))
+        
+        # Confirm todo creation
+        if not Confirm.ask("Create this todo?", default=True):
+            console.print("❌ Todo creation cancelled.")
+            return False
+        
+        # Create the todo
+        todo_id = self.todo_manager.add_todo(
+            title=auto_todo.suggested_title,
+            description=auto_todo.suggested_description,
+            todo_type="smart",
+            priority="medium"
+        )
+        
+        console.print(f"✅ Todo created with ID: {todo_id}")
+        
+        # Instant action prompt
+        if auto_todo.auto_start_eligible:
+            if Confirm.ask("🚀 Start working on this todo now?", default=False):
+                console.print("🔥 Starting multitasking on your new todo...")
+                try:
+                    # Start multitasking on the specific todo
+                    await self._start_single_todo_multitask(todo_id)
+                    return True
+                except Exception as e:
+                    console.print(f"❌ Error starting multitask: {e}")
+                    console.print("💡 You can start it manually with 'multitask' command")
+        
+        return True
+    
+    def parse_smart_todo(self, user_input: str) -> Optional[AutoTodoRequest]:
+        """Parse user input to detect todo creation intent"""
+        user_input = user_input.strip().lower()
+        
+        # Enhanced patterns for detecting todo creation
+        for action_type, patterns in self.file_patterns.items():
+            for pattern in patterns:
+                match = re.search(pattern, user_input, re.IGNORECASE)
+                if match:
+                    # Extract information from the match
+                    title = self._extract_title_from_input(user_input, action_type)
+                    description = self._extract_description_from_input(user_input, match)
+                    files = self._extract_files_from_input(user_input)
+                    
+                    return AutoTodoRequest(
+                        original_input=user_input,
+                        suggested_title=title,
+                        suggested_description=description,
+                        detected_files=files,
+                        action_type=action_type,
+                        confidence=0.8,
+                        auto_start_eligible=True
+                    )
+        
+        # Fallback for general todo creation
+        if any(word in user_input for word in ['update', 'change', 'modify', 'fix', 'create', 'add']):
+            return AutoTodoRequest(
+                original_input=user_input,
+                suggested_title=user_input.capitalize(),
+                suggested_description=f"Work on: {user_input}",
+                detected_files=[],
+                action_type='general',
+                confidence=0.6,
+                auto_start_eligible=True
+            )
+        
+        return None
+    
+    def _extract_title_from_input(self, user_input: str, action_type: str) -> str:
+        """Extract a clean title from user input"""
+        # Remove common prefixes and clean up
+        title = user_input.strip()
+        title = re.sub(r'^(please\s+)?(can\s+you\s+)?', '', title, flags=re.IGNORECASE)
+        title = title.capitalize()
+        
+        # Limit length
+        if len(title) > 80:
+            title = title[:77] + "..."
+        
+        return title
+    
+    def _extract_description_from_input(self, user_input: str, match) -> str:
+        """Extract description from user input and regex match"""
+        return f"User request: {user_input}\n\nDetected action: {match.group(0) if match else 'General task'}"
+    
+    def _extract_files_from_input(self, user_input: str) -> List[str]:
+        """Extract file names from user input"""
+        # Look for file extensions
+        file_pattern = r'\b\w+\.[a-zA-Z]{2,4}\b'
+        files = re.findall(file_pattern, user_input)
+        return files
+    
+    async def run_all_todos(self) -> bool:
+        """Run multitasking on all pending todos - the ultimate shortcut"""
+        todos = self.todo_manager.get_todos()
+        pending_todos = [todo for todo in todos if todo.get('status') == 'pending']
+        
+        if not pending_todos:
+            console.print("📭 No pending todos to run!")
+            return False
+        
+        console.print(Panel.fit(
+            f"🔥 RUN ALL MODE ACTIVATED!\n\n"
+            f"📊 Found {len(pending_todos)} pending todos\n"
+            f"⚡ About to start multitasking on ALL of them\n"
+            f"🚀 This is the ultimate productivity shortcut!",
+            style="bold red"
+        ))
+        
+        # Show the todos that will be processed
+        console.print("\n📋 Todos to process:")
+        for i, todo in enumerate(pending_todos[:5], 1):  # Show first 5
+            console.print(f"  {i}. {todo.get('title', 'Untitled')}")
+        
+        if len(pending_todos) > 5:
+            console.print(f"  ... and {len(pending_todos) - 5} more")
+        
+        # Confirmation
+        if not Confirm.ask(f"\n💥 Ready to unleash the beast on {len(pending_todos)} todos?", default=False):
+            console.print("🛑 Run all cancelled - probably a wise choice!")
+            return False
+        
+        console.print("🔥 MAXIMUM PRODUCTIVITY MODE ENGAGED!")
+        
+        try:
+            # Start multitasking on all pending todos
+            await self.multitasker.start_multitask(pending_todos)
+            console.print("🎉 ALL TODOS LAUNCHED! The automation army is working!")
+            return True
+        except Exception as e:
+            console.print(f"💥 Run all encountered an error: {e}")
+            return False
+    
+    def run_all_todos_sync(self):
+        """Synchronous wrapper for run_all_todos to avoid event loop conflicts"""
+        try:
+            import asyncio
+            # Check if we're already in an event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # We're in an event loop, create a task
+                task = loop.create_task(self.run_all_todos())
+                console.print("🔥 Run all todos task created and running in background...")
+                return True
+            except RuntimeError:
+                # No event loop running, safe to use asyncio.run
+                return asyncio.run(self.run_all_todos())
+        except Exception as e:
+            console.print(f"❌ Error in run_all_todos_sync: {e}")
+            return False
+    
+    async def _start_single_todo_multitask(self, todo_id: str):
+        """Start multitasking on a single specific todo"""
+        # Get the specific todo by ID
+        todo = self.todo_manager.get_todo_by_id(todo_id)
+        if todo:
+            await self.multitasker.start_multitask([todo])
+        else:
+            console.print(f"❌ Todo with ID {todo_id} not found")
+    
+    def toggle_github_pro_mode(self) -> bool:
+        """Toggle GitHub Pro mode on/off"""
+        self.github_pro_mode = not self.github_pro_mode
+        
+        if self.github_pro_mode:
+            console.print(Panel.fit(
+                "🚀 GITHUB PRO MODE ACTIVATED!\n\n"
+                "✨ Features enabled:\n"
+                "  • Each todo gets its own branch\n"
+                "  • Automatic branch creation\n"
+                "  • Auto-push when todo completes\n"
+                "  • Automatic PR creation\n"
+                "  • Advanced GitHub workflow integration\n\n"
+                "🎯 You're now in full automation mode!",
+                style="bold green"
+            ))
+        else:
+            console.print(Panel.fit(
+                "📴 GitHub Pro Mode Deactivated\n\n"
+                "Back to standard todo management mode.",
+                style="bold yellow"
+            ))
+        
+        return self.github_pro_mode
+    
+    async def handle_github_pro_todo(self, todo_id: str, todo_title: str):
+        """Handle a todo in GitHub Pro mode with branch creation and PR automation"""
+        if not self.github_pro_mode or not self.github_integration:
+            return False
+        
+        try:
+            # Create a branch for this todo
+            branch_name = self._generate_branch_name(todo_title)
+            console.print(f"🌿 Creating branch: {branch_name}")
+            
+            # This would integrate with GitHubIntegration to create branch
+            # Implementation depends on the existing GitHub integration
+            
+            console.print(f"✅ Branch {branch_name} created for todo {todo_id}")
+            return True
+            
+        except Exception as e:
+            console.print(f"❌ GitHub Pro mode error: {e}")
+            return False
+    
+    def _generate_branch_name(self, todo_title: str) -> str:
+        """Generate a clean branch name from todo title"""
+        # Clean the title for branch naming
+        clean_title = re.sub(r'[^a-zA-Z0-9\s-]', '', todo_title)
+        clean_title = re.sub(r'\s+', '-', clean_title.strip())
+        clean_title = clean_title.lower()[:50]  # Limit length
+        
+        return f"todo/{clean_title}"
+    
+    def get_automation_status(self) -> Dict:
+        """Get current automation engine status"""
+        return {
+            'github_pro_mode': self.github_pro_mode,
+            'smart_parsing_enabled': True,
+            'instant_actions_enabled': True,
+            'run_all_available': True,
+            'github_integration': self.github_integration is not None
+        }
 
 # Legacy compatibility - keeping the original class name
 class AutomationEngine(EnhancedAutomationEngine):

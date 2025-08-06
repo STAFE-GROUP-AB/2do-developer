@@ -148,10 +148,10 @@ class IntentRouter:
             "parse-markdown": [
                 {
                     "patterns": [
-                        r"(parse|read|import)\s+.*(markdown|md)",
-                        r"markdown\s+.*(parse|read|import|tasks|todos)",
-                        r"(load|import)\s+.*(tasks|todos)\s+.*(file|markdown|md)",
-                        r"\.md\s+(file|tasks|todos)",
+                        r"^(parse|read|import|scan)\s+.*(markdown|md)\s+(file|files|tasks|todos)",
+                        r"^(parse|scan)\s+markdown\s+(for\s+)?(tasks|todos)",
+                        r"^(load|import)\s+(tasks|todos)\s+from\s+.*(markdown|md)",
+                        r"^(find|extract)\s+(tasks|todos)\s+in\s+.*(markdown|md)",
                     ],
                     "confidence": 0.9
                 }

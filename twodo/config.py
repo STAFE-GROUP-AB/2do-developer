@@ -99,7 +99,16 @@ class ConfigManager:
                     "max_parallel_tasks": 5,
                     "memory_enabled": True
                 },
-                "mcp_servers": [],
+                "mcp_servers": [
+                    {
+                        "name": "filesystem",
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                        "type": "official",
+                        "enabled": True
+                    }
+                ],
+                "mcp_tokens": {},
                 "analysis": {
                     "last_analyzed": None,
                     "tech_stack": [],
@@ -301,7 +310,271 @@ class ConfigManager:
     
     def get_mcp_servers(self) -> list:
         """Get configured MCP servers"""
-        return self.config["mcp_servers"]
+        return self.config.get("mcp_servers", [])
+    
+    def add_mcp_token(self, service: str, token: str):
+        """Add MCP service token"""
+        if "mcp_tokens" not in self.config:
+            self.config["mcp_tokens"] = {}
+        self.config["mcp_tokens"][service] = token
+        self._save_config()
+    
+    def get_mcp_token(self, service: str) -> Optional[str]:
+        """Get MCP service token - prioritize environment variables"""
+        # Environment variable mapping
+        env_var_map = {
+            "github": "GITHUB_TOKEN",
+            "figma": "FIGMA_ACCESS_TOKEN",
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY"
+        }
+        
+        # Check environment variable first
+        env_var = env_var_map.get(service)
+        if env_var:
+            env_value = os.getenv(env_var)
+            if env_value and env_value.strip():
+                return env_value.strip()
+        
+        # Fallback to config file
+        return self.config.get("mcp_tokens", {}).get(service)
+    
+    def configure_advanced_mcp_servers(self):
+        """Configure advanced MCP servers with interactive setup"""
+        from rich.console import Console
+        from rich.prompt import Prompt, Confirm
+        
+        console = Console()
+        
+        if self.suppress_prompts:
+            console.print("🔧 Skipping interactive MCP setup (suppressed)")
+            return
+        
+        console.print("\n🚀 [bold blue]Advanced MCP Server Configuration[/bold blue]")
+        console.print("Configure additional MCP servers for enhanced AI capabilities:\n")
+        
+        # Web Fetch MCP Server
+        if self._should_configure_server("web-fetch"):
+            if Confirm.ask("📡 Configure Web Fetch MCP (AI can research web content, APIs, docs)?"):
+                self._add_web_fetch_server()
+                console.print("✅ Web Fetch MCP configured!")
+        
+        # Memory MCP Server
+        if self._should_configure_server("memory"):
+            if Confirm.ask("🧠 Configure Memory MCP (persistent context across sessions)?"):
+                self._add_memory_server()
+                console.print("✅ Memory MCP configured!")
+        
+        # Database MCP Server
+        if self._should_configure_server("database"):
+            if Confirm.ask("🗄️ Configure Database MCP (direct database operations)?"):
+                db_config = self._configure_database_server()
+                if db_config:
+                    console.print("✅ Database MCP configured!")
+        
+        # Figma MCP Server
+        if self._should_configure_server("figma"):
+            if Confirm.ask("🎨 Configure Figma MCP (design system integration)?"):
+                figma_token = self._configure_figma_server()
+                if figma_token:
+                    console.print("✅ Figma MCP configured!")
+        
+        # GitHub MCP Server (enhance existing)
+        if self._should_configure_server("github"):
+            if Confirm.ask("🐙 Enhance GitHub MCP with personal access token?"):
+                github_token = self._configure_github_server()
+                if github_token:
+                    console.print("✅ GitHub MCP enhanced!")
+        
+        console.print("\n🎉 [bold green]MCP server configuration complete![/bold green]")
+    
+    def _should_configure_server(self, server_name: str) -> bool:
+        """Check if server should be configured"""
+        existing_servers = [s.get("name") for s in self.get_mcp_servers()]
+        return server_name not in existing_servers
+    
+    def _add_web_fetch_server(self):
+        """Add Web Fetch MCP server"""
+        server_config = {
+            "name": "web-fetch",
+            "command": "npx",
+            "args": ["-y", "@zcaceres/fetch-mcp"],
+            "type": "community",
+            "enabled": True,
+            "description": "Web scraping and API calls"
+        }
+        self.add_mcp_server(server_config)
+    
+    def _add_memory_server(self):
+        """Add Memory MCP server"""
+        server_config = {
+            "name": "memory",
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-memory"],
+            "type": "official",
+            "enabled": True,
+            "description": "Persistent context and memory"
+        }
+        self.add_mcp_server(server_config)
+    
+    def _configure_database_server(self) -> bool:
+        """Configure Database MCP server"""
+        from rich.prompt import Prompt
+        from rich.console import Console
+        
+        console = Console()
+        
+        # Check for common database files/configs
+        db_detected = self._detect_database_config()
+        
+        if db_detected:
+            console.print(f"🔍 Detected database: {db_detected['type']}")
+            
+            server_config = {
+                "name": "database",
+                "command": "go",
+                "args": ["run", "."],
+                "type": "community",
+                "enabled": True,
+                "description": "Direct database operations",
+                "config": db_detected
+            }
+            self.add_mcp_server(server_config)
+            return True
+        else:
+            console.print("⚠️ No database configuration detected")
+            console.print("💡 Database MCP can be configured later when you have a database")
+            return False
+    
+    def _configure_figma_server(self) -> Optional[str]:
+        """Configure Figma MCP server"""
+        from rich.prompt import Prompt
+        from rich.console import Console
+        
+        console = Console()
+        
+        # Check for existing token
+        existing_token = self.get_mcp_token("figma")
+        if existing_token:
+            console.print(f"✅ Using existing Figma token: {existing_token[:8]}...")
+            figma_token = existing_token
+        else:
+            console.print("\n📋 [bold]To create a Figma Personal Access Token:[/bold]")
+            console.print("1. Go to Figma.com → Settings → Account → Personal access tokens")
+            console.print("2. Click 'Create new token'")
+            console.print("3. Give it a name (e.g., '2do MCP Integration')")
+            console.print("4. Copy the generated token\n")
+            
+            figma_token = Prompt.ask("Enter your Figma Personal Access Token (or 'skip')", password=True)
+            
+            if figma_token.lower() == 'skip' or not figma_token.strip():
+                console.print("⏭️ Skipping Figma integration")
+                return None
+            
+            # Save token
+            self.add_mcp_token("figma", figma_token)
+        
+        # Add server config
+        server_config = {
+            "name": "figma",
+            "command": "npx",
+            "args": ["-y", "figma-developer-mcp", f"--figma-api-key={figma_token}", "--stdio"],
+            "type": "community",
+            "enabled": True,
+            "description": "Figma design system integration"
+        }
+        self.add_mcp_server(server_config)
+        return figma_token
+    
+    def _configure_github_server(self) -> Optional[str]:
+        """Configure GitHub MCP server with token"""
+        from rich.prompt import Prompt
+        from rich.console import Console
+        
+        console = Console()
+        
+        # Check for existing token
+        existing_token = self.get_mcp_token("github")
+        if existing_token:
+            console.print(f"✅ Using existing GitHub token: {existing_token[:8]}...")
+            github_token = existing_token
+        else:
+            console.print("\n📋 [bold]To create a GitHub Personal Access Token:[/bold]")
+            console.print("1. Go to GitHub.com → Settings → Developer settings → Personal access tokens")
+            console.print("2. Click 'Generate new token (classic)'")
+            console.print("3. Select scopes: repo, read:user, user:email")
+            console.print("4. Copy the generated token\n")
+            
+            github_token = Prompt.ask("Enter your GitHub Personal Access Token (or 'skip')", password=True)
+            
+            if github_token.lower() == 'skip' or not github_token.strip():
+                console.print("⏭️ Skipping GitHub token configuration")
+                return None
+            
+            # Save token
+            self.add_mcp_token("github", github_token)
+        
+        # Update existing GitHub server or add new one
+        existing_servers = self.get_mcp_servers()
+        github_server_exists = any(s.get("name") == "github" for s in existing_servers)
+        
+        if not github_server_exists:
+            server_config = {
+                "name": "github",
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-github"],
+                "type": "official",
+                "enabled": True,
+                "description": "GitHub repository integration",
+                "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": github_token}
+            }
+            self.add_mcp_server(server_config)
+        
+        return github_token
+    
+    def _detect_database_config(self) -> Optional[Dict]:
+        """Detect database configuration from common files"""
+        # Check for .env file
+        env_file = Path.cwd() / '.env'
+        if env_file.exists():
+            try:
+                with open(env_file, 'r') as f:
+                    env_content = f.read()
+                
+                # Parse database config
+                if 'DATABASE_URL=' in env_content or 'DB_CONNECTION=' in env_content:
+                    # Extract database type and connection info
+                    db_type = 'sqlite'  # Default
+                    if 'mysql' in env_content.lower():
+                        db_type = 'mysql'
+                    elif 'postgres' in env_content.lower():
+                        db_type = 'postgres'
+                    
+                    return {
+                        'type': db_type,
+                        'source': '.env file',
+                        'detected': True
+                    }
+            except Exception:
+                pass
+        
+        # Check for common database files
+        db_files = [
+            Path.cwd() / 'database.sqlite',
+            Path.cwd() / 'db.sqlite3',
+            Path.cwd() / 'data.db'
+        ]
+        
+        for db_file in db_files:
+            if db_file.exists():
+                return {
+                    'type': 'sqlite',
+                    'path': str(db_file),
+                    'source': f'File: {db_file.name}',
+                    'detected': True
+                }
+        
+        return None
     
     def has_been_analyzed(self, repo_path: str = None) -> bool:
         """Check if repository has been analyzed recently"""

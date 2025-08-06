@@ -489,7 +489,6 @@ def analyze(project, force):
     except Exception as e:
         console.print(f"❌ Error during analysis: {e}")
 
-
 @cli.command()
 @click.option('--check-only', is_flag=True, help='Only check for updates without installing')
 @click.option('--force', is_flag=True, help='Force update even if already up to date')
@@ -509,6 +508,61 @@ def update(check_only, force):
         console.print(f"❌ Update error: {e}")
         raise click.ClickException("Update process failed")
 
+@cli.command()
+@click.option('--interactive', is_flag=True, default=True, help='Interactive configuration mode')
+@click.option('--list', 'list_servers', is_flag=True, help='List configured MCP servers')
+def mcp(interactive, list_servers):
+    """Configure advanced MCP servers for enhanced AI capabilities"""
+    from .config import ConfigManager
+    from rich.table import Table
+    
+    config_manager = ConfigManager()
+    
+    if list_servers:
+        # List configured servers
+        servers = config_manager.get_mcp_servers()
+        
+        if not servers:
+            console.print("💭 No MCP servers configured")
+            return
+        
+        table = Table(title="🚀 Configured MCP Servers")
+        table.add_column("Name", style="cyan")
+        table.add_column("Type", style="green")
+        table.add_column("Status", style="yellow")
+        table.add_column("Description", style="white")
+        
+        for server in servers:
+            status = "✅ Enabled" if server.get('enabled', True) else "❌ Disabled"
+            table.add_row(
+                server.get('name', 'Unknown'),
+                server.get('type', 'Unknown'),
+                status,
+                server.get('description', 'No description')
+            )
+        
+        console.print(table)
+        return
+    
+    if interactive:
+        # Interactive configuration
+        console.print("🎆 [bold blue]Advanced MCP Server Configuration[/bold blue]")
+        console.print("Enhance your 2do with powerful AI capabilities:\n")
+        
+        console.print("📡 [bold]Web Fetch MCP[/bold] - Research web content, APIs, and documentation")
+        console.print("🧠 [bold]Memory MCP[/bold] - Persistent context and memory across sessions")
+        console.print("🗄️ [bold]Database MCP[/bold] - Direct database operations and queries")
+        console.print("🎨 [bold]Figma MCP[/bold] - Design system integration and component access")
+        console.print("🐙 [bold]GitHub MCP[/bold] - Enhanced repository operations with tokens\n")
+        
+        try:
+            config_manager.configure_advanced_mcp_servers()
+        except KeyboardInterrupt:
+            console.print("\n⏹️ Configuration cancelled")
+        except Exception as e:
+            console.print(f"\n❌ Configuration error: {e}")
+    else:
+        console.print("💡 Use --interactive flag for guided setup or --list to view configured servers")
 
 @cli.command("add-ai")
 @click.option('--provider', help='AI provider name (e.g., openai, anthropic, google)')
@@ -1912,53 +1966,6 @@ def smart_analyze(project, file, max_files):
             
     except Exception as e:
         console.print(f"❌ Error during analysis: {e}")
-
-@cli.command()
-@click.option('--project', '-p', help='Project path (default: current directory)')
-def smart_todo(project):
-    """Create intelligent todos based on code analysis"""
-    console.print(Panel.fit("🎯 Smart Todo Generation", style="bold green"))
-    
-    try:
-        project_path = project or os.getcwd()
-        analyzer = SmartCodeAnalyzer()
-        
-        # Analyze project
-        console.print(f"🔍 Analyzing project for todo opportunities: {project_path}")
-        project_analysis = analyzer.analyze_project(project_path, 30)
-        
-        if not project_analysis.file_analyses:
-            console.print("❌ No code files found to analyze")
-            return
-        
-        # Generate smart todos
-        smart_todos = _generate_smart_todos(project_analysis)
-        
-        if not smart_todos:
-            console.print("✅ No immediate development tasks identified!")
-            return
-        
-        console.print(f"\n📋 Generated {len(smart_todos)} smart development todos:")
-        
-        # Initialize todo manager
-        config_manager = ConfigManager()
-        todo_manager = TodoManager(config_manager.config_dir)
-        
-        for i, todo_data in enumerate(smart_todos, 1):
-            console.print(f"   {i}. {todo_data['content'][:80]}...")
-            
-            if Confirm.ask(f"Create this todo?", default=True):
-                todo_id = todo_manager.add_todo(
-                    content=todo_data['content'],
-                    todo_type="code",
-                    priority=todo_data['priority']
-                )
-                console.print(f"      ✅ Created todo #{todo_id}")
-        
-        console.print(f"\n🎉 Smart todo generation complete!")
-        
-    except Exception as e:
-        console.print(f"❌ Error generating smart todos: {e}")
 
 @cli.command()
 @click.option('--project', '-p', help='Project path (default: current directory)')
