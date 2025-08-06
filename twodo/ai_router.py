@@ -327,6 +327,11 @@ class AIRouter:
         self.models = self._initialize_models()
         console.print("✅ All models enabled! Use 'ai-list' to see available models.")
     
+    def set_developer_context(self, context: str):
+        """Set the developer context for enhanced AI responses"""
+        self.developer_context = context
+        console.print(f"🎯 Developer context set ({len(context)} characters)")
+    
     def _setup_clients(self):
         """Setup API clients for each provider"""
         self.clients = {}
