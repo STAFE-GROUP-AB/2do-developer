@@ -261,20 +261,37 @@ class UpdateManager:
                     console.print(f"❌ Failed to download: {result.stderr}")
                     return False
                 
-                # Ensure python-dotenv is installed first
-                console.print("🔧 Installing dependencies...")
-                result = subprocess.run([
-                    str(pip_path), "install", "python-dotenv"
+                # Install all dependencies first to ensure nothing is missing
+                console.print("🔧 Installing all dependencies...")
+                
+                # First, upgrade pip to ensure compatibility
+                subprocess.run([
+                    str(pip_path), "install", "--upgrade", "pip"
                 ], capture_output=True, text=True)
                 
-                if result.returncode != 0:
-                    console.print(f"❌ Failed to install dependencies: {result.stderr}")
-                    return False
+                # Install critical dependencies that are often missing
+                critical_deps = [
+                    "python-dotenv>=1.0.0",
+                    "croniter>=6.0.0", 
+                    "apscheduler>=3.11.0",
+                    "setuptools>=65.0.0",
+                    "wheel"
+                ]
                 
-                # Install the updated package
-                console.print("📦 Installing updated 2do...")
+                for dep in critical_deps:
+                    console.print(f"📦 Installing {dep}...")
+                    result = subprocess.run([
+                        str(pip_path), "install", dep
+                    ], capture_output=True, text=True)
+                    
+                    if result.returncode != 0:
+                        console.print(f"⚠️ Warning: Failed to install {dep}: {result.stderr}")
+                        # Continue anyway, as the main install might handle it
+                
+                # Install the updated package with all dependencies
+                console.print("📦 Installing updated 2do with all dependencies...")
                 result = subprocess.run([
-                    str(pip_path), "install", "--upgrade", str(repo_path)
+                    str(pip_path), "install", "--upgrade", "--force-reinstall", str(repo_path)
                 ], capture_output=True, text=True, cwd=str(repo_path))
                 
                 if result.returncode == 0:
@@ -303,11 +320,24 @@ class UpdateManager:
         try:
             console.print("🚀 Updating via pip...")
             
+            # First, ensure critical dependencies are installed
+            console.print("🔧 Installing critical dependencies...")
+            critical_deps = [
+                "python-dotenv>=1.0.0",
+                "croniter>=6.0.0", 
+                "apscheduler>=3.11.0"
+            ]
+            
+            for dep in critical_deps:
+                subprocess.run([
+                    sys.executable, "-m", "pip", "install", dep
+                ], capture_output=True, text=True)
+            
             # Update from GitHub repository
             repo_url = f"git+https://github.com/{self.repo_owner}/{self.repo_name}.git"
             
             result = subprocess.run([
-                sys.executable, "-m", "pip", "install", "--upgrade", repo_url
+                sys.executable, "-m", "pip", "install", "--upgrade", "--force-reinstall", repo_url
             ], capture_output=True, text=True)
             
             if result.returncode == 0:
