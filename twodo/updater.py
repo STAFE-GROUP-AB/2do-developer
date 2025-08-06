@@ -29,8 +29,22 @@ class UpdateManager:
         self.repo_owner = "STAFE-GROUP-AB"
         self.repo_name = "2do-developer"
         self.github_api_base = "https://api.github.com"
-        self.current_version = self._get_current_version()
-        self.install_method = self._detect_install_method()
+        
+        try:
+            self.current_version = self._get_current_version()
+            # Ensure we never have an empty version
+            if not self.current_version or not self.current_version.strip():
+                console.print("⚠️ Warning: Could not detect version, using default 0.1.0")
+                self.current_version = "0.1.0"
+        except Exception as e:
+            console.print(f"⚠️ Error detecting version: {e}, using default 0.1.0")
+            self.current_version = "0.1.0"
+        
+        try:
+            self.install_method = self._detect_install_method()
+        except Exception as e:
+            console.print(f"⚠️ Error detecting install method: {e}, using unknown")
+            self.install_method = "unknown"
         
     def _get_current_version(self) -> str:
         """Get current installed version"""
@@ -38,7 +52,9 @@ class UpdateManager:
             # Try to get version from package metadata
             import pkg_resources
             try:
-                return pkg_resources.get_distribution("2do").version
+                version = pkg_resources.get_distribution("2do").version
+                if version and version.strip():
+                    return version
             except pkg_resources.DistributionNotFound:
                 pass
         except ImportError:
@@ -52,11 +68,31 @@ class UpdateManager:
             if pyproject_path.exists():
                 with open(pyproject_path, 'r') as f:
                     data = toml.load(f)
-                    return data.get('project', {}).get('version', '0.1.0')
-        except ImportError:
+                    version = data.get('project', {}).get('version', '0.1.0')
+                    if version and version.strip():
+                        return version
+        except (ImportError, Exception) as e:
+            # If toml is not available or parsing fails, continue to fallback
             pass
         
-        # Final fallback
+        # Alternative fallback: try to parse pyproject.toml manually
+        try:
+            current_dir = Path(__file__).parent.parent
+            pyproject_path = current_dir / "pyproject.toml"
+            if pyproject_path.exists():
+                with open(pyproject_path, 'r') as f:
+                    content = f.read()
+                    # Simple regex to extract version
+                    import re
+                    version_match = re.search(r'version\s*=\s*["\']([^"\']*)["\'']', content)
+                    if version_match:
+                        version = version_match.group(1)
+                        if version and version.strip():
+                            return version
+        except Exception:
+            pass
+        
+        # Final fallback - ensure we never return empty string
         return "0.1.0"
     
     def _detect_install_method(self) -> str:
@@ -109,11 +145,25 @@ class UpdateManager:
             release_data = response.json()
             latest_version = release_data['tag_name'].lstrip('v')
             
-            # Compare versions
-            current_ver = version.parse(self.current_version)
-            latest_ver = version.parse(latest_version)
-            
-            update_available = latest_ver > current_ver
+            # Compare versions with error handling
+            try:
+                # Ensure versions are not empty
+                if not self.current_version or not self.current_version.strip():
+                    console.print("⚠️ Warning: Current version is empty, defaulting to 0.1.0")
+                    self.current_version = "0.1.0"
+                
+                if not latest_version or not latest_version.strip():
+                    console.print("⚠️ Warning: Latest version is empty, using current version")
+                    latest_version = self.current_version
+                
+                current_ver = version.parse(self.current_version)
+                latest_ver = version.parse(latest_version)
+                
+                update_available = latest_ver > current_ver
+            except Exception as e:
+                console.print(f"⚠️ Version comparison failed: {e}")
+                # Default to no update available if version parsing fails
+                update_available = False
             
             return {
                 'update_available': update_available,
