@@ -724,19 +724,36 @@ jobs:
             console.print(f"💥 Run all encountered an error: {e}")
             return False
     
-    def run_all_todos_sync(self):
+    def run_all_todos_sync(self, working_dir=None):
         """Synchronous wrapper for run_all_todos to avoid event loop conflicts"""
         try:
             import asyncio
+            import os
+            
+            # CRITICAL FIX: Ensure we have the correct working directory
+            if working_dir is None:
+                working_dir = os.getcwd()
+            
+            console.print(f"🎯 AUTOMATION ENGINE: Using working directory: {working_dir}")
+            
+            # CRITICAL FIX: Re-initialize AI router with correct working directory
+            if hasattr(self.multitasker, 'ai_router'):
+                console.print("🔧 Re-initializing AI router with correct working directory...")
+                try:
+                    # Initialize all MCP servers with the correct working directory
+                    asyncio.run(self.multitasker.ai_router.initialize_all_servers(working_dir))
+                    console.print("✅ AI router re-initialized successfully")
+                except Exception as init_error:
+                    console.print(f"⚠️ AI router re-initialization failed: {init_error}")
+            
             # Check if we're already in an event loop
             try:
                 loop = asyncio.get_running_loop()
-                # We're in an event loop, create a task
+                # We're in a running loop, use create_task
                 task = loop.create_task(self.run_all_todos())
-                console.print("🔥 Run all todos task created and running in background...")
-                return True
+                return task
             except RuntimeError:
-                # No event loop running, safe to use asyncio.run
+                # No running loop, safe to use asyncio.run
                 return asyncio.run(self.run_all_todos())
         except Exception as e:
             console.print(f"❌ Error in run_all_todos_sync: {e}")

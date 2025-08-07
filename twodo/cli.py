@@ -376,8 +376,8 @@ def start(repo, force_analyze):
             handle_multitask(multitasker, todo_manager, browser_integration)
         elif action == "run-all":
             # The ultimate shortcut - run all todos at once!
-            # CRITICAL FIX: Make automation engine run_all_todos synchronous to avoid nested loops
-            automation_engine.run_all_todos_sync()
+            # CRITICAL FIX: Pass working directory to ensure correct file operations
+            automation_engine.run_all_todos_sync(working_dir)
         elif action == "parse-markdown":
             handle_parse_markdown(todo_manager, working_dir)
         elif action == "mcp-management":
