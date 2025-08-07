@@ -60,6 +60,15 @@ class AIRouter:
         # OpenAI models
         if self.config.get_api_key("openai"):
             all_openai_models = {
+                "gpt-5": ModelCapability(
+                    name="gpt-5",
+                    provider="openai",
+                    strengths=["reasoning", "complex_tasks", "code", "code_analysis", "multimodal", "general", "tall_stack", "testing", "architecture", "refactoring", "debugging", "creative", "analysis"],
+                    context_length=200000,
+                    cost_per_token=0.008,
+                    speed_rating=9,
+                    is_free=False
+                ),
                 "gpt-4o": ModelCapability(
                     name="gpt-4o",
                     provider="openai",
@@ -514,9 +523,23 @@ class AIRouter:
             
             # Enhanced scoring logic
             
+            # Default model preferences - GPT-5 and Claude Opus 4 are top choices
+            if model.name == "gpt-5":
+                score += 50  # Very strong preference for GPT-5 as the new default
+            elif "claude-opus-4" in model.name:
+                score += 45  # Very strong preference for Claude Opus 4
+            elif model.name == "gpt-4o":
+                score += 15  # Good fallback option
+            elif "claude-3-5-sonnet" in model.name:
+                score += 12  # Good Claude alternative
+            
             # TALL Stack specialization bonus
             if analysis.get("tall_stack", 0) > 0.3:
-                if model.provider == "anthropic" and "claude-3-5" in model.name:
+                if model.name == "gpt-5":
+                    score += 20  # GPT-5 gets top priority for TALL stack
+                elif "claude-opus-4" in model.name:
+                    score += 18  # Claude Opus 4 is excellent for TALL stack
+                elif model.provider == "anthropic" and "claude-3-5" in model.name:
                     score += 15  # Claude 3.5 excels at PHP/Laravel
                 elif model.provider == "openai" and "gpt-4o" in model.name:
                     score += 12  # GPT-4o is great for full-stack
@@ -525,15 +548,23 @@ class AIRouter:
             
             # Code-specific bonuses
             if analysis.get("code", 0) > 0.5:
-                if "gpt-4" in model.name or "claude-3" in model.name:
+                if model.name == "gpt-5":
+                    score += 18  # GPT-5 gets highest priority for code tasks
+                elif "claude-opus-4" in model.name:
+                    score += 15  # Claude Opus 4 is excellent for code
+                elif "gpt-4" in model.name or "claude-3" in model.name:
                     score += 10  # Premium models for complex code
                 if model.provider == "anthropic":
                     score += 5   # Anthropic models are great for code
             
             # Debugging and troubleshooting
             if analysis.get("debugging", 0) > 0.5:
-                if "claude-3-5-sonnet" in model.name:
-                    score += 20  # Claude 3.5 Sonnet excels at debugging
+                if model.name == "gpt-5":
+                    score += 22  # GPT-5 gets top priority for debugging
+                elif "claude-opus-4" in model.name:
+                    score += 20  # Claude Opus 4 is excellent for debugging
+                elif "claude-3-5-sonnet" in model.name:
+                    score += 18  # Claude 3.5 Sonnet excels at debugging
                 elif "gpt-4o" in model.name:
                     score += 15
             
@@ -546,29 +577,45 @@ class AIRouter:
             
             # Architecture and design patterns
             if analysis.get("architecture", 0) > 0.5:
-                if "claude-3-opus" in model.name:
-                    score += 18  # Opus is excellent for architectural decisions
+                if model.name == "gpt-5":
+                    score += 20  # GPT-5 is excellent for architecture
+                elif "claude-opus-4" in model.name:
+                    score += 18  # Claude Opus 4 is excellent for architectural decisions
+                elif "claude-3-opus" in model.name:
+                    score += 16  # Original Opus is excellent for architectural decisions
                 elif "gpt-4" in model.name:
                     score += 15
             
             # Documentation tasks
             if analysis.get("documentation", 0) > 0.5:
-                if "claude-3" in model.name:
+                if model.name == "gpt-5":
+                    score += 15  # GPT-5 is excellent for documentation
+                elif "claude-opus-4" in model.name:
+                    score += 14  # Claude Opus 4 is excellent for documentation
+                elif "claude-3" in model.name:
                     score += 12  # Claude models excel at documentation
                 elif "gpt-4" in model.name:
                     score += 10
             
             # Refactoring tasks
             if analysis.get("refactoring", 0) > 0.5:
-                if "claude-3-5-sonnet" in model.name:
-                    score += 18  # Sonnet is excellent for refactoring
+                if model.name == "gpt-5":
+                    score += 20  # GPT-5 is excellent for refactoring
+                elif "claude-opus-4" in model.name:
+                    score += 18  # Claude Opus 4 is excellent for refactoring
+                elif "claude-3-5-sonnet" in model.name:
+                    score += 16  # Sonnet is excellent for refactoring
                 elif "gpt-4" in model.name:
                     score += 12
             
             # Multimodal tasks (images, UI, etc.)
             if analysis.get("multimodal", 0) > 0.5:
-                if "gpt-4o" in model.name or "gpt-4-turbo" in model.name:
+                if model.name == "gpt-5":
+                    score += 22  # GPT-5 has advanced multimodal capabilities
+                elif "gpt-4o" in model.name or "gpt-4-turbo" in model.name:
                     score += 20  # GPT-4o/Turbo have vision capabilities
+                elif "claude-opus-4" in model.name:
+                    score += 18  # Claude Opus 4 has vision
                 elif "claude-3" in model.name:
                     score += 15  # Claude 3 has vision
                 elif "gemini" in model.name:
