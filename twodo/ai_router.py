@@ -775,17 +775,155 @@ class AIRouter:
 2. CALL write_file("README.md", new_content) to update it
 3. Confirm the file was actually modified
 
+⚠️ IMPORTANT FILE SELECTION RULES:
+- ALWAYS use the user's project README.md file, NOT vendor/node_modules/package files
+- If the prompt specifies a file path, use it exactly as provided
+- Avoid modifying files in vendor/, node_modules/, .git/, cache/ directories
+- Prioritize files in the project root or user-created directories
+
 REMEMBER: You have real file system access - USE IT!
 """
         
         return f"{file_operation_context}\n\nUser Request: {prompt}"
     
+    async def _handle_interactive_requirements(self, prompt: str) -> str:
+        """Handle interactive requirements like location for weather and README file selection"""
+        prompt_lower = prompt.lower()
+        
+        # Check for weather-related requests that need location
+        weather_keywords = ['weather', 'forecast', 'temperature', 'climate', 'meteorology']
+        if any(keyword in prompt_lower for keyword in weather_keywords):
+            location = await self._prompt_for_location(prompt)
+            if location:
+                prompt = f"{prompt} for location: {location}"
+        
+        # Check for README.md operations and ensure correct file selection
+        readme_keywords = ['readme', 'readme.md']
+        if any(keyword in prompt_lower for keyword in readme_keywords):
+            prompt = await self._handle_readme_file_selection(prompt)
+        
+        return prompt
+    
+    async def _prompt_for_location(self, prompt: str) -> str:
+        """Prompt user for location when weather forecast is requested"""
+        from rich.prompt import Prompt
+        
+        console.print(f"🌍 Weather forecast requested. I need a location to provide accurate weather information.")
+        location = Prompt.ask("Please enter the location (city, country)", default="")
+        
+        if location.strip():
+            console.print(f"📍 Using location: {location}")
+            return location.strip()
+        else:
+            console.print("⚠️ No location provided. Weather forecast may be general.")
+            return ""
+    
+    async def _handle_readme_file_selection(self, prompt: str) -> str:
+        """Handle README.md file selection to ensure we use the correct user file"""
+        # Find all README.md files in the current project, excluding vendor directories
+        readme_files = await self._find_user_readme_files()
+        
+        if len(readme_files) == 0:
+            console.print("📝 No README.md files found in the current project.")
+            return prompt
+        elif len(readme_files) == 1:
+            readme_path = readme_files[0]
+            console.print(f"📝 Using README.md file: {readme_path}")
+            return f"{prompt} (Target file: {readme_path})"
+        else:
+            # Multiple README files found, ask user to choose
+            selected_readme = await self._prompt_readme_selection(readme_files)
+            if selected_readme:
+                console.print(f"📝 Using selected README.md file: {selected_readme}")
+                return f"{prompt} (Target file: {selected_readme})"
+        
+        return prompt
+    
+    async def _find_user_readme_files(self) -> List[str]:
+        """Find README.md files in the project, excluding vendor directories"""
+        import os
+        import fnmatch
+        
+        readme_files = []
+        exclude_patterns = [
+            'vendor', 'node_modules', '.git', 'cache', 
+            'dist', 'build', '__pycache__', '.venv',
+            'venv', '.env'
+        ]
+        
+        # Start from current working directory
+        try:
+            current_dir = os.getcwd()
+        except OSError:
+            current_dir = str(Path.home())
+        
+        for root, dirs, files in os.walk(current_dir):
+            # Skip excluded directories by modifying dirs in-place
+            relative_root = os.path.relpath(root, current_dir)
+            
+            # Remove excluded directories from dirs to prevent walking into them
+            dirs_to_remove = []
+            for dir_name in dirs:
+                if dir_name in exclude_patterns:
+                    dirs_to_remove.append(dir_name)
+            
+            for dir_name in dirs_to_remove:
+                dirs.remove(dir_name)
+            
+            # Check if current directory path contains excluded patterns
+            path_parts = relative_root.split(os.sep)
+            if any(part in exclude_patterns for part in path_parts):
+                continue
+            
+            for file in files:
+                if file.lower() in ['readme.md', 'readme.markdown', 'readme.rst', 'readme.txt', 'readme']:
+                    file_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(file_path, current_dir)
+                    readme_files.append(relative_path)
+        
+        return readme_files
+    
+    async def _prompt_readme_selection(self, readme_files: List[str]) -> str:
+        """Prompt user to select which README file to use"""
+        from rich.prompt import Prompt
+        from rich.table import Table
+        
+        # Display available README files
+        table = Table(title="Multiple README files found")
+        table.add_column("Number", style="cyan", justify="center")
+        table.add_column("README File Path", style="green")
+        
+        for i, file_path in enumerate(readme_files, 1):
+            table.add_row(str(i), file_path)
+        
+        console.print(table)
+        
+        # Prompt for selection
+        max_num = len(readme_files)
+        selection = Prompt.ask(
+            f"Please enter the number of the README file to use (1-{max_num})",
+            default="1"
+        )
+        
+        try:
+            selected_index = int(selection) - 1
+            if 0 <= selected_index < len(readme_files):
+                return readme_files[selected_index]
+            else:
+                console.print(f"⚠️ Invalid selection. Using first README file: {readme_files[0]}")
+                return readme_files[0]
+        except ValueError:
+            console.print(f"⚠️ Invalid input. Using first README file: {readme_files[0]}")
+            return readme_files[0]
+
     async def route_and_process(self, prompt: str, todo_context: str = None) -> str:
         """Route prompt to best model and process it"""
+        # Check for interactive requirements before processing
+        enhanced_prompt = await self._handle_interactive_requirements(prompt)
+        
         # Enhance prompt with developer context if available
-        enhanced_prompt = prompt
-        if self.developer_context and not prompt.startswith("Based on this request:"):
-            enhanced_prompt = f"{self.developer_context}\n\nUser request: {prompt}"
+        if self.developer_context and not enhanced_prompt.startswith("Based on this request:"):
+            enhanced_prompt = f"{self.developer_context}\n\nUser request: {enhanced_prompt}"
         
         # Try the best model first
         try:
