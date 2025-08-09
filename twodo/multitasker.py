@@ -7,6 +7,7 @@ import concurrent.futures
 from typing import List, Dict
 from rich.console import Console
 from rich.progress import Progress, TaskID
+from .escape_handler import check_escape_interrupt, EscapeInterrupt, raise_if_interrupted
 
 console = Console()
 
@@ -32,11 +33,19 @@ class Multitasker:
             todo_title = todo['title'][:50] + "..." if len(todo['title']) > 50 else todo['title']
             console.print(f"🔨 Starting work on: [bold cyan]{todo_title}[/bold cyan]")
             
+            # Check for escape interrupt before starting
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Todo processing interrupted by escape key")
+            
             # Create prompt based on todo type and content
             prompt = self._create_prompt_for_todo(todo)
             
             # Show routing stage
             console.print(f"🤔 Analyzing task requirements for optimal AI model...")
+            
+            # Check for escape interrupt before AI processing
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Todo processing interrupted by escape key")
             
             # Route to best AI model and process
             result = await self.ai_router.route_and_process(prompt, todo_context=todo_title)
@@ -60,6 +69,21 @@ class Multitasker:
                 # Show completion
                 console.print(f"✅ Completed: [bold green]{todo_title}[/bold green]")
                 
+                return todo
+            
+        except EscapeInterrupt as e:
+            # Handle escape interrupt gracefully
+            todo_title = todo['title'][:50] + "..." if len(todo['title']) > 50 else todo['title']
+            console.print(f"⚠️ Interrupted: [bold yellow]{todo_title}[/bold yellow] - {str(e)}")
+            
+            # Update status to interrupted
+            if self.todo_manager:
+                self.todo_manager.update_todo_status(todo_id, "pending", "Interrupted by user")
+                updated_todo = self.todo_manager.get_todo_by_id(todo_id)
+                return updated_todo if updated_todo else todo
+            else:
+                todo["status"] = "pending"
+                todo["result"] = "Interrupted by user"
                 return todo
             
         except Exception as e:
@@ -209,6 +233,10 @@ class Multitasker:
             async def process_with_semaphore(todo):
                 nonlocal completed_count
                 async with semaphore:
+                    # Check for escape interrupt before processing each todo
+                    if check_escape_interrupt():
+                        raise EscapeInterrupt("Multitasking interrupted by escape key")
+                        
                     result = await self.process_todo_async(todo)
                     completed_count += 1
                     
@@ -221,10 +249,19 @@ class Multitasker:
             # Create tasks for all todos
             tasks = [process_with_semaphore(todo) for todo in todos]
             
-            # Wait for all tasks to complete
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            return [r for r in results if not isinstance(r, Exception)]
+            # Wait for all tasks to complete with escape handling
+            try:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                return [r for r in results if not isinstance(r, Exception)]
+            except EscapeInterrupt:
+                console.print("\n⚠️ Multitasking interrupted by escape key")
+                # Cancel remaining tasks
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                # Return partial results
+                completed_results = [r for r in results if r is not None and not isinstance(r, Exception)]
+                return completed_results
     
     def _display_results(self, results: List[Dict]):
         """Display processing results"""

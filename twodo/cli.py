@@ -45,6 +45,7 @@ from .updater import UpdateManager
 from .smart_code_analyzer import SmartCodeAnalyzer
 from .automation_engine import EnhancedAutomationEngine
 from .scheduler import Scheduler
+from .escape_handler import escape_listener, check_escape_interrupt, EscapeInterrupt, raise_if_interrupted
 
 
 console = Console()
@@ -268,6 +269,20 @@ def start(repo, force_analyze):
     """Start the 2DO interactive session"""
     console.print(Panel.fit("🤖 2DO Starting...", style="bold green"))
     
+    # Start global escape listener
+    with escape_listener():
+        try:
+            _start_interactive_session(repo, force_analyze)
+        except EscapeInterrupt:
+            console.print("\n⚠️ [yellow]Session interrupted by user (Escape key)[/yellow]")
+            console.print("💡 Use '2do start' to begin a new session")
+            return
+
+def _start_interactive_session(repo, force_analyze):
+    """Internal method for the interactive session logic"""
+    # Check for escape interrupt at key points
+    raise_if_interrupted()
+    
     # Determine the working directory with error handling
     working_dir = repo if repo else _get_safe_working_directory()
     
@@ -283,6 +298,9 @@ def start(repo, force_analyze):
             console.print(f"❌ Critical error: {e2}")
             console.print("💡 Please run '2do setup' from your home directory")
             return
+    
+    # Check for escape interrupt after configuration
+    raise_if_interrupted()
     
     if config_manager.is_local_project:
         console.print(f"📁 Using local 2DO folder in git repository: {working_dir}")
@@ -855,16 +873,29 @@ def handle_multitask(multitasker, todo_manager, browser_integration):
         return
     
     console.print(f"🚀 Starting multitask processing for {len(todos)} todos...")
+    console.print("💡 Press Escape key at any time to interrupt the operation")
     
     if Confirm.ask("Proceed with multitasking?"):
-        # CRITICAL FIX: start_multitask is now async, use asyncio.run
-        asyncio.run(multitasker.start_multitask(todos))
-        console.print("✅ Multitasking completed!")
-        
-        # Auto-refresh browser if active
-        if browser_integration.is_active:
-            console.print("🔄 Auto-refreshing browser...")
-            browser_integration.refresh_browser()
+        try:
+            with escape_listener() as escape_handler:
+                # CRITICAL FIX: start_multitask is now async, use asyncio.run
+                asyncio.run(multitasker.start_multitask(todos))
+                
+                if escape_handler.is_interrupted():
+                    console.print("⚠️ Multitasking interrupted by user")
+                    return
+                    
+            console.print("✅ Multitasking completed!")
+            
+            # Auto-refresh browser if active
+            if browser_integration.is_active:
+                console.print("🔄 Auto-refreshing browser...")
+                browser_integration.refresh_browser()
+                
+        except EscapeInterrupt:
+            console.print("⚠️ Multitasking interrupted by escape key")
+        except KeyboardInterrupt:
+            console.print("⚠️ Multitasking interrupted by user (Ctrl+C)")
 
 def show_chat_help():
     """Display help information for chat commands"""
@@ -895,7 +926,7 @@ def show_chat_help():
 def handle_chat(ai_router, image_handler):
     """Handle interactive chat with AI routing"""
     console.print("💬 Chat")
-    console.print("💡 Type '?' for help or 'exit' to return to main menu\n")
+    console.print("💡 Type '?' for help, 'exit' to return to main menu, or press Escape to interrupt AI responses\n")
     
     # Clean up old temporary files
     image_handler.cleanup_old_temp_files()
@@ -948,16 +979,28 @@ def handle_chat(ai_router, image_handler):
         else:
             prompt_with_image = prompt
         
-        # Route to best AI model
-        if image_path:
-            # Legacy format support
-            if hasattr(ai_router, 'route_and_process_with_image'):
-                response = ai_router.route_and_process_with_image(prompt, image_path)
-            else:
-                response = asyncio.run(ai_router.route_and_process(f"{prompt}\n\n[Image: {image_path}]"))
-        else:
-            response = asyncio.run(ai_router.route_and_process(prompt_with_image))
-        console.print(f"\n🤖 AI: {response}\n")
+        # Route to best AI model with escape handling
+        try:
+            with escape_listener() as escape_handler:
+                if image_path:
+                    # Legacy format support
+                    if hasattr(ai_router, 'route_and_process_with_image'):
+                        response = ai_router.route_and_process_with_image(prompt, image_path)
+                    else:
+                        response = asyncio.run(ai_router.route_and_process(f"{prompt}\n\n[Image: {image_path}]"))
+                else:
+                    response = asyncio.run(ai_router.route_and_process(prompt_with_image))
+                
+                if escape_handler.is_interrupted():
+                    console.print("\n⚠️ AI response interrupted by user")
+                    continue
+                    
+            console.print(f"\n🤖 AI: {response}\n")
+            
+        except EscapeInterrupt:
+            console.print("\n⚠️ AI response interrupted by escape key")
+        except KeyboardInterrupt:
+            console.print("\n⚠️ AI response interrupted by user (Ctrl+C)")
 
 def handle_parse_markdown(todo_manager, working_dir):
     """Handle parsing markdown files for tasks"""

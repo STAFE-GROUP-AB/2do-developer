@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from rich.console import Console
 from .config import ConfigManager
 from .mcp_client import MCPClient
+from .escape_handler import check_escape_interrupt, EscapeInterrupt, raise_if_interrupted
 
 # Import AI clients
 import openai
@@ -986,12 +987,20 @@ REMEMBER: You have real file system access - USE IT!
 
     async def route_and_process(self, prompt: str, todo_context: str = None) -> str:
         """Route prompt to best model and process it"""
+        # Check for escape interrupt before processing
+        if check_escape_interrupt():
+            raise EscapeInterrupt("AI processing interrupted by escape key")
+        
         # Check for interactive requirements before processing
         enhanced_prompt = await self._handle_interactive_requirements(prompt)
         
         # Enhance prompt with developer context if available
         if self.developer_context and not enhanced_prompt.startswith("Based on this request:"):
             enhanced_prompt = f"{self.developer_context}\n\nUser request: {enhanced_prompt}"
+        
+        # Check for escape interrupt before model selection
+        if check_escape_interrupt():
+            raise EscapeInterrupt("AI processing interrupted by escape key")
         
         # Try the best model first
         try:
@@ -1004,6 +1013,10 @@ REMEMBER: You have real file system access - USE IT!
             # Try fallback models
             fallback_models = [name for name in self.models.keys() if name != model_name]
             for fallback_model in fallback_models:
+                # Check for escape interrupt before trying fallback
+                if check_escape_interrupt():
+                    raise EscapeInterrupt("AI processing interrupted by escape key")
+                    
                 try:
                     console.print(f"🔄 Trying fallback model: {fallback_model}")
                     self.last_selected_model = fallback_model
@@ -1084,6 +1097,10 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
     async def _process_openai(self, model_name: str, prompt: str) -> str:
         """Process prompt using OpenAI model with filesystem tools"""
         try:
+            # Check for escape interrupt before processing
+            if check_escape_interrupt():
+                raise EscapeInterrupt("OpenAI processing interrupted by escape key")
+                
             client = self.clients["openai"]
             
             # Enhance prompt with file operation instructions if filesystem is available
@@ -1109,6 +1126,10 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
                 request_params['tools'] = tools
                 request_params['tool_choice'] = 'auto'
                 console.print(f"🔧 OpenAI model has access to {len(tools)} tools for comprehensive analysis")
+            
+            # Check for escape interrupt before API call
+            if check_escape_interrupt():
+                raise EscapeInterrupt("OpenAI processing interrupted by escape key")
             
             # Create completion with or without tools
             response = client.chat.completions.create(**request_params)
@@ -1249,6 +1270,10 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
     async def _process_anthropic(self, model_name: str, prompt: str) -> str:
         """Process prompt using Anthropic model with filesystem tools"""
         try:
+            # Check for escape interrupt before processing
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Anthropic processing interrupted by escape key")
+                
             client = self.clients["anthropic"]
             
             # Prepare messages
@@ -1260,6 +1285,10 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
                 tools = self.mcp_client.get_all_tools_for_anthropic()
                 if tools:
                     console.print(f"🔧 Anthropic model has access to {len(tools)} tools for comprehensive analysis")
+            
+            # Check for escape interrupt before API call
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Anthropic processing interrupted by escape key")
             
             # Create completion with or without tools
             if tools:
@@ -1297,6 +1326,10 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
             raise ValueError("Google Generative AI library not available. Please install google-generativeai.")
         
         try:
+            # Check for escape interrupt before processing
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Google processing interrupted by escape key")
+                
             client = self.clients["google"]
             model = client.GenerativeModel(model_name)
             
@@ -1304,6 +1337,10 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
             enhanced_prompt = prompt
             if self.filesystem_initialized:
                 enhanced_prompt = self._add_file_operation_instructions(prompt)
+        
+            # Check for escape interrupt before API call
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Google processing interrupted by escape key")
             
             response = model.generate_content(enhanced_prompt)
             
