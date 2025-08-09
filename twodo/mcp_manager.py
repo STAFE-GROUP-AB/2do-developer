@@ -370,25 +370,44 @@ class MCPServerManager:
         return recommended_servers
     
     def setup_mcp_servers_interactive(self, project_path: str = None) -> bool:
-        """Complete interactive MCP server setup process"""
-        console.print(Panel.fit("🔌 MCP Server Setup", style="bold blue"))
+        """Complete interactive MCP server setup with human colleague approach"""
+        console.print(Panel.fit("🔌 MCP Server Setup - Let's optimize your development environment!", style="bold blue"))
+        
+        console.print("😊 Hey! I'm going to analyze your project and suggest some MCP servers that'll make your development workflow much smoother.")
+        console.print("💡 Think of these as power-ups for our AI collaboration!")
         
         # Run analysis and get recommendations
         recommended_servers = self.run_tech_stack_analysis_and_recommend(project_path)
         
         if not recommended_servers:
-            console.print("No MCP servers to recommend.")
+            console.print("🤔 Hmm, I couldn't find specific recommendations for your project.")
+            console.print("💡 But don't worry! The essential servers will still help you a lot.")
             return False
         
         # Display recommendations
+        console.print(f"\n🎯 Based on your project, I found {len(recommended_servers)} servers that could really help!")
         self.display_recommended_servers(recommended_servers)
         
-        # Interactive selection
+        # Interactive selection with encouraging tone
+        console.print(f"\n🤝 Now, let's pick which ones you'd like me to set up.")
+        console.print("💭 I recommend starting with the essential ones - they're like having a super-powered assistant!")
+        
         selected_servers = self.select_servers_interactive(recommended_servers)
         
         if not selected_servers:
-            console.print("No MCP servers selected.")
+            console.print("👍 No problem! You can always set these up later when you're ready.")
+            console.print("💡 Just run '2do mcp' anytime to come back to this setup.")
             return False
         
-        # Configure selected servers
-        return self.configure_mcp_servers(selected_servers)
+        # Configure selected servers with progress updates
+        console.print(f"\n🚀 Awesome! Let me configure {len(selected_servers)} servers for you...")
+        success = self.configure_mcp_servers(selected_servers)
+        
+        if success:
+            console.print("🎉 Perfect! Your development environment is now supercharged!")
+            console.print("💪 These servers will help me understand your project better and provide more accurate assistance.")
+            console.print("🧠 I'll remember your preferences and project context across sessions now!")
+        else:
+            console.print("😅 Something went wrong with the setup, but we can try again anytime.")
+        
+        return success

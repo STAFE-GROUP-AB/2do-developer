@@ -62,11 +62,11 @@ class IntentRouter:
                         r"\b(list|show|display|view)\s+(todos|tasks|items)",
                         r"(what|which)\s+(todos|tasks).*?(do\s+i\s+have|pending|outstanding)",
                         r"(show|tell)\s+me.*?(todos|tasks|items)",
-                        r"(what\s+)?(am\s+i\s+)?(supposed\s+to\s+)?(working\s+on|doing)",
+                        r"(what\s+)?(am\s+i\s+)?(supposed\s+to\s+)?(working\s+on|doing)(?!\s+(multiple|several|all|everything))",
                         r"(current|pending|active)\s+(todos|tasks|work)",
-                        r"what\s+(should|can)\s+i\s+(work\s+on|do)",
+                        r"what\s+(should|can)\s+i\s+(work\s+on|do)(?!\s+(multiple|several|all|everything))",
                         r"todo\s+(list|status)",
-                        r"(my\s+)?(todos|tasks|work|items)",
+                        r"(my\s+)?(todos|tasks|work|items)(?!\s+(at\s+once|simultaneously|in\s+parallel))",
                     ],
                     "confidence": 0.95
                 }
@@ -87,14 +87,17 @@ class IntentRouter:
                 {
                     "patterns": [
                         r"(start|begin|run)\s+(multitask|multi.task|parallel)",
-                        r"(process|work\s+on)\s+(all|multiple)\s+(todos|tasks)",
+                        r"(work\s+on|tackle|process)\s+(all|multiple|several)\s+(todos|tasks)\s+(at\s+once|simultaneously|in\s+parallel)",
                         r"(batch|bulk)\s+(process|execute|run)",
                         r"(do|execute|run)\s+(everything|all\s+todos|all\s+tasks)",
                         r"multitask\s+on\s+(all|my|pending)",
                         r"run.*multitask",
                         r"process.*all.*pending",
+                        r"(work\s+on|tackle)\s+(multiple|several)\s+(todos|tasks)\s+(at\s+once|together|simultaneously)",
+                        r"(let\'s|let\s+us)\s+(work\s+on|tackle)\s+(multiple|several)",
+                        r"(multiple|several)\s+(todos|tasks).*?(at\s+once|together|parallel|simultaneous)",
                     ],
-                    "confidence": 0.9
+                    "confidence": 0.95
                 }
             ],
             "run-all": [
@@ -322,105 +325,104 @@ class IntentRouter:
             return IntentMatch("add-todo", 0.5)
     
     def get_friendly_confirmation(self, intent: str, extracted_params: Dict = None) -> str:
-        """Get a friendly confirmation message for the detected intent"""
+        """Get a friendly, human colleague-like confirmation message for the detected intent"""
         messages = {
             "add-todo": [
-                "🎯 I'll help you add a new todo!",
-                "✨ Let's create a new task for you!",
-                "📝 Time to add another item to your todo list!",
-                "🚀 Ready to capture that new task!",
+                "🎯 Got it! Looks like you want to track a new task.",
+                "✨ I see you've got something new to work on - let me help you organize it!",
+                "📝 Perfect! I'll help you capture this task so you don't forget.",
+                "🚀 Awesome! Let's get this new task properly documented.",
             ],
             "list-todos": [
-                "📋 Let me show you what's on your plate!",
-                "👀 Here's what you're working on...",
-                "📊 Time to check your current workload!",
-                "🔍 Let's see what tasks are waiting for you!",
+                "📋 Sure thing! Let me show you everything on your plate right now.",
+                "👀 Of course! Here's your current workload at a glance.",
+                "📊 Absolutely! Let's see what you're juggling these days.",
+                "🔍 No problem! Here are all the tasks waiting for your attention.",
             ],
             "create-subtasks": [
-                "🔨 Let's break that big task into smaller pieces!",
-                "🧩 Time to make that complex todo more manageable!",
-                "📏 I'll help you organize that task better!",
+                "🔨 Great idea! Let's break that big task into bite-sized pieces.",
+                "🧩 Smart thinking! I'll help make that complex todo more manageable.",
+                "📏 Excellent! Breaking it down will make it much easier to tackle.",
             ],
             "multitask": [
-                "🚀 Time to get productive! Let's multitask!",
-                "⚡ Ready to tackle multiple todos at once!",
-                "🎯 Multitasking mode activated - let's do this!",
-                "💪 Time to show those todos who's boss!",
+                "🚀 I love the productivity mindset! Let's get multiple AI agents working for you.",
+                "⚡ Perfect! Time to unleash the power of parallel processing on your todos.",
+                "🎯 Fantastic choice! Multiple tasks at once - that's how we get things done.",
+                "💪 Yes! Let's show those todos what teamwork looks like.",
             ],
             "run-all": [
-                "🔥 ALL SYSTEMS GO! Running everything at once!",
-                "⚡ FULL POWER MODE! Let's crush all your todos!",
-                "🚀 MAXIMUM PRODUCTIVITY! Processing all tasks now!",
-                "💥 BEAST MODE ACTIVATED! All todos starting now!",
-                "🎯 THE ULTIMATE SHORTCUT! Everything runs now!",
+                "🔥 WOW! Going for the full productivity blitz - I'm impressed!",
+                "⚡ LOVE the ambition! Let's get ALL your todos handled with multiple AI agents!",
+                "🚀 This is what I call maximum efficiency! Every pending task will get attention.",
+                "💥 You're not messing around! Full power mode with up to 5 AI agents at once!",
+                "🎯 THE ULTIMATE MOVE! I'll coordinate multiple AI agents to handle everything.",
             ],
             "github-issues": [
-                "🐙 Let's check what's happening on GitHub!",
-                "📋 Time to sync with your repository issues!",
-                "🔍 Diving into your GitHub issues...",
+                "🐙 Absolutely! Let's see what's brewing in your GitHub repository.",
+                "📋 Great! Time to sync up with your repository and see what needs attention.",
+                "🔍 Perfect! I'll help you manage your GitHub issues like a pro.",
             ],
             "create-github-issue": [
-                "🐛 Let's report that issue to GitHub!",
-                "📝 I'll help you create a new GitHub issue!",
-                "🎯 Time to document that problem properly!",
+                "🐛 Good thinking! Let's document that issue properly in GitHub.",
+                "📝 Smart approach! I'll help you create a detailed GitHub issue.",
+                "🎯 Excellent! Proper issue tracking is key to good development.",
             ],
             "export-todos-to-github": [
-                "📤 Let's get those todos synced to GitHub!",
-                "🔄 Time to export your work to GitHub issues!",
-                "🚀 Moving your todos to GitHub for better tracking!",
+                "📤 Brilliant idea! Let's get your local todos synced with GitHub.",
+                "🔄 Perfect! Moving your work to GitHub will improve visibility and tracking.",
+                "🚀 Smart workflow! GitHub integration makes collaboration so much easier.",
             ],
             "parse-markdown": [
-                "📖 Let me parse those markdown files for tasks!",
-                "🔍 Scanning for todos in your markdown files...",
-                "📋 Extracting tasks from your documentation!",
+                "📖 Clever! Let me extract all the tasks hiding in your markdown files.",
+                "🔍 Great idea! I'll scan through your docs and find all the TODOs.",
+                "📋 Perfect! Your documentation probably has tons of actionable items.",
             ],
             "browser-integration": [
-                "🌐 Setting up browser integration for you!",
-                "⚡ Getting your dev environment ready!",
-                "🚀 Browser mode activated!",
+                "🌐 Excellent! Let's get your development environment supercharged.",
+                "⚡ Smart move! Browser integration makes development so much smoother.",
+                "🚀 Love it! Real-time feedback while you work is a game-changer.",
             ],
             "remove-todo": [
-                "🗑️ I'll help you remove that todo!",
-                "✂️ Time to clean up your task list!",
-                "🧹 Let's get rid of that todo for you!",
-                "❌ Ready to delete that task!",
+                "🗑️ No problem! Let's clean up your task list.",
+                "✂️ Absolutely! Sometimes we need to declutter our workload.",
+                "🧹 Sure thing! I'll help you remove that task.",
+                "❌ Got it! Let's get rid of what you don't need anymore.",
             ],
             "remove-completed-todos": [
-                "🧽 Time for some spring cleaning!",
-                "✨ Let's clear out those completed tasks!",
-                "🗂️ I'll help you archive the finished work!",
-                "🎉 Ready to celebrate by cleaning up completed todos!",
+                "🧽 Great idea! Nothing like a clean slate to feel accomplished.",
+                "✨ Perfect timing for some organizational housekeeping!",
+                "🗂️ Smart! Archiving completed work gives you a clear view of what's next.",
+                "🎉 Love it! Celebrating completed work by clearing the deck!",
             ],
             "mcp-management": [
-                "🔌 Let's manage your MCP servers!",
-                "⚙️ Time to configure those development tools!",
-                "🛠️ Setting up your development environment!",
+                "🔌 Excellent! Let's optimize your development tools and server setup.",
+                "⚙️ Perfect! Proper MCP configuration will supercharge your workflow.",
+                "🛠️ Smart thinking! Good tool setup saves hours of development time.",
             ],
             "chat": [
-                "💬 I'm here to help with whatever you need!",
-                "🤖 Ready to assist you with development questions!",
-                "💡 What's on your mind? Let's figure it out together!",
-                "🎯 I'm your friendly coding companion - what can I help with?",
+                "💬 Of course! I'm here to help with whatever's on your mind.",
+                "🤔 Great question! Let me think about that with you.",
+                "💡 I love helping with problems - what's up?",
+                "🧠 Perfect! Let's put our heads together on this.",
             ],
             "quit": [
-                "👋 Catch you later! Happy coding!",
-                "🚀 Until next time - keep building awesome things!",
-                "✨ See you soon! Go make something amazing!",
+                "👋 Thanks for working with me today! Take care!",
+                "😊 It was great helping you out! See you next time!",
+                "🎉 Good session! Hope I helped you get things done!",
+                "💪 Keep up the great work! I'll be here when you need me!",
             ]
         }
         
-        intent_messages = messages.get(intent, ["Let's get this done!"])
+        # Get a random message for variety, or fallback
         import random
-        message = random.choice(intent_messages)
+        intent_messages = messages.get(intent, ["🤖 Let me help you with that!"])
+        selected_message = random.choice(intent_messages)
         
-        # Add parameter-specific details if available
+        # Add extracted parameter context if available
         if extracted_params and "suggested_title" in extracted_params:
-            if intent == "add-todo":
-                message += f" I see you want to work on: '{extracted_params['suggested_title']}'"
-            elif intent == "create-github-issue":
-                message += f" About: '{extracted_params['suggested_title']}'"
+            selected_message += f"\n💡 I noticed you mentioned: '{extracted_params['suggested_title']}'"
         
-        return message
+        return selected_message
     
     def get_developer_context_prompt(self) -> str:
         """Get context for the AI to be developer-focused and friendly"""
