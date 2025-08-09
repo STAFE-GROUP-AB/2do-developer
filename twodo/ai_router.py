@@ -528,11 +528,24 @@ class AIRouter:
             
             # Enhanced scoring logic
             
+
             # Default model preferences - Claude Opus 4 is the premier model for coding
             if "claude-opus-4" in model.name:
                 score += 55  # Claude Opus 4 is the premier model for coding tasks
             elif model.name == "gpt-5":
                 score += 45  # GPT-5 is excellent but Opus 4 leads for coding
+
+            # User preference override - respect user's preferred default model
+            preferred_default = self.config.get_preference("preferred_default_model", "gpt-5")
+            if preferred_default != "auto":
+                if model.name == preferred_default:
+                    score += 100  # Very strong preference for user's chosen default
+                    
+            # Default model preferences - GPT-5 and Claude Opus 4 are top choices  
+            if model.name == "gpt-5":
+                score += 50  # Very strong preference for GPT-5 as the new default
+            elif "claude-opus-4" in model.name:
+                score += 45  # Very strong preference for Claude Opus 4
             elif model.name == "gpt-4o":
                 score += 15  # Good fallback option
             elif "claude-3-5-sonnet" in model.name:
