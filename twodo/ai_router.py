@@ -5,11 +5,13 @@ AI Router - Intelligent routing of prompts to the best AI model
 import asyncio
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 
 from rich.console import Console
+from rich.prompt import Prompt
 from .config import ConfigManager
 from .mcp_client import MCPClient
 from .escape_handler import check_escape_interrupt, EscapeInterrupt, raise_if_interrupted
@@ -26,6 +28,61 @@ except ImportError:
     GOOGLE_AI_AVAILABLE = False
 
 console = Console()
+
+def _is_terminal_interactive():
+    """Enhanced terminal interactivity detection (handles curl | bash correctly)"""
+    # Check if stdout and stderr are terminals (even if stdin is piped)
+    if os.isatty(1) and os.isatty(2):
+        # Check if we're NOT in a CI environment
+        if not any(env in os.environ for env in ['CI', 'GITHUB_ACTIONS', 'JENKINS_URL', 'GITLAB_CI']):
+            # Try to access controlling terminal directly
+            try:
+                return os.path.exists('/dev/tty')
+            except:
+                pass
+    
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+def _safe_prompt(message, default="", timeout=30):
+    """Enhanced prompting with better terminal detection and timeout"""
+    try:
+        if _is_terminal_interactive():
+            # Use Rich's Prompt.ask with timeout handling
+            try:
+                import signal
+                
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("Prompt timeout")
+                
+                # Set up timeout for non-Windows systems
+                if hasattr(signal, 'SIGALRM'):
+                    signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(timeout)
+                
+                try:
+                    result = Prompt.ask(message, default=default)
+                    return result.strip() if result else default
+                finally:
+                    # Clear the alarm
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.alarm(0)
+                        
+            except TimeoutError:
+                console.print(f"⏰ Prompt timed out after {timeout} seconds, using default: {default}")
+                return default
+            except Exception as e:
+                console.print(f"⚠️ Prompt error: {e}, using default: {default}")
+                return default
+        else:
+            # In non-interactive mode, return default
+            console.print(f"⚠️ Non-interactive mode: {message} [default: {default}]")
+            return default
+    except (KeyboardInterrupt, EOFError):
+        raise
+    except Exception as e:
+        # If prompt fails, return default
+        console.print(f"⚠️ Could not get input for: {message}, error: {e}")
+        return default
 
 @dataclass
 class ModelCapability:
@@ -875,10 +932,8 @@ REMEMBER: You have real file system access - USE IT!
     
     async def _prompt_for_location(self, prompt: str) -> str:
         """Prompt user for location when weather forecast is requested"""
-        from rich.prompt import Prompt
-        
         console.print(f"🌍 Weather forecast requested. I need a location to provide accurate weather information.")
-        location = Prompt.ask("Please enter the location (city, country)", default="")
+        location = _safe_prompt("Please enter the location (city, country)", default="", timeout=30)
         
         if location.strip():
             console.print(f"📍 Using location: {location}")
@@ -954,7 +1009,6 @@ REMEMBER: You have real file system access - USE IT!
     
     async def _prompt_readme_selection(self, readme_files: List[str]) -> str:
         """Prompt user to select which README file to use"""
-        from rich.prompt import Prompt
         from rich.table import Table
         
         # Display available README files
@@ -967,11 +1021,12 @@ REMEMBER: You have real file system access - USE IT!
         
         console.print(table)
         
-        # Prompt for selection
+        # Prompt for selection with safe prompting and timeout
         max_num = len(readme_files)
-        selection = Prompt.ask(
+        selection = _safe_prompt(
             f"Please enter the number of the README file to use (1-{max_num})",
-            default="1"
+            default="1",
+            timeout=30
         )
         
         try:
