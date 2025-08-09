@@ -763,8 +763,29 @@ class MCPClient:
     
     async def _request_permission_async(self, file_path: str, operation: str) -> bool:
         """Async wrapper for permission requests"""
+        # Map MCP tool names to standard permission types
+        permission_mapping = {
+            'read_text_file': 'read',
+            'read_file': 'read',
+            'read_media_file': 'read',
+            'read_multiple_files': 'read',
+            'list_directory': 'read',
+            'list_directory_with_sizes': 'read',
+            'directory_tree': 'read',
+            'search_files': 'read',
+            'get_file_info': 'read',
+            'list_allowed_directories': 'read',
+            'write_file': 'write',
+            'edit_file': 'write',
+            'create_directory': 'write',
+            'move_file': 'write'
+        }
+        
+        # Convert operation to standard permission type
+        permission_type = permission_mapping.get(operation, operation)
+        
         return self.permission_manager.request_permission(
-            file_path, operation, 
+            file_path, permission_type, 
             reason=f"AI model requested {operation} access during task execution"
         )
     
