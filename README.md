@@ -9,17 +9,27 @@
 ### ⚡ **Intelligent AI Model Routing**
 Stop guessing which AI model to use! 2DO automatically analyzes your prompts and selects the optimal model from OpenAI (GPT-4, GPT-3.5), Anthropic (Claude), and Google (Gemini). Save money by using cost-effective models for simple tasks and powerful models for complex work.
 
+*Example: Simple code formatting → Uses Claude Haiku (fast & cheap). Complex architectural decisions → Uses GPT-4 (thorough & powerful).*
+
 ### 🎯 **Parallel Task Processing** 
 Process up to 5 AI tasks simultaneously. What used to take 30 minutes now takes 6 minutes. Perfect for batch processing code reviews, documentation, or multiple development tasks.
+
+*Example: Review 5 code files, generate documentation, and create tests - all at once instead of one by one.*
 
 ### 🌐 **Smart Development Integration**
 Automatically detects your project type (React, Laravel, Django, etc.) and starts the right development server. See your AI-generated changes instantly in your browser with auto-refresh.
 
+*Example: Working on a React app? 2DO starts `npm run dev`, opens your browser, and refreshes it after each completed task.*
+
 ### 📋 **Advanced Todo Management**
 Transform your development workflow with intelligent todo management, GitHub integration, and automatic task breakdown for complex projects.
 
+*Example: Add "Build user authentication" → 2DO breaks it into: design database schema, create API endpoints, build frontend forms, add tests.*
+
 ### 🔧 **25+ Technology Detection**
 Instantly understands your tech stack (Python, JavaScript, React, Laravel, Docker, etc.) and provides contextually-aware AI assistance tailored to your specific technologies.
+
+*Example: In a Laravel project, 2DO knows about Artisan commands, Eloquent models, and Blade templates.*
 
 ## 🛠️ Installation
 
