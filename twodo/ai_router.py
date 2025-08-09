@@ -127,7 +127,7 @@ class AIRouter:
                 "claude-opus-4-20250514": ModelCapability(
                     name="claude-opus-4-20250514",
                     provider="anthropic",
-                    strengths=["reasoning", "creative", "complex_analysis", "research", "writing"],
+                    strengths=["reasoning", "creative", "complex_analysis", "research", "writing", "code", "debugging", "architecture", "refactoring", "testing", "tall_stack"],
                     context_length=200000,
                     cost_per_token=0.015,
                     speed_rating=6,
@@ -136,7 +136,7 @@ class AIRouter:
                 "claude-sonnet-4-20250514": ModelCapability(
                     name="claude-sonnet-4-20250514",
                     provider="anthropic",
-                    strengths=["reasoning", "code", "balanced", "general", "analysis"],
+                    strengths=["reasoning", "code", "balanced", "general", "analysis", "debugging", "refactoring", "testing", "tall_stack"],
                     context_length=200000,
                     cost_per_token=0.003,
                     speed_rating=8,
@@ -385,9 +385,10 @@ class AIRouter:
         code_keywords = {
             'basic': ['code', 'programming', 'function', 'class', 'method', 'variable'],
             'advanced': ['algorithm', 'optimization', 'refactor', 'architecture', 'design pattern'],
-            'debugging': ['debug', 'error', 'bug', 'fix', 'trace', 'troubleshoot'],
+            'debugging': ['debug', 'error', 'bug', 'fix', 'trace', 'troubleshoot', 'memory leak', 'infinite loop', 'indexerror'],
             'testing': ['test', 'unit test', 'integration', 'mock', 'assert', 'coverage'],
-            'git': ['git', 'commit', 'branch', 'merge', 'pull request', 'repository']
+            'git': ['git', 'commit', 'branch', 'merge', 'pull request', 'repository'],
+            'database': ['database', 'query', 'sql', 'performance', 'connection', 'schema']
         }
         
         for category, keywords in code_keywords.items():
@@ -400,11 +401,15 @@ class AIRouter:
                 elif category == 'debugging':
                     analysis["debugging"] += 0.9
                     analysis["reasoning"] += 0.5
+                    analysis["code"] += 0.6  # Debugging is also code work
                 elif category == 'testing':
                     analysis["testing"] += 0.9
                     analysis["code"] += 0.6
                 elif category == 'git':
                     analysis["code"] += 0.5
+                elif category == 'database':
+                    analysis["code"] += 0.8  # Database work is coding
+                    analysis["debugging"] += 0.5  # Often involves debugging
         
         # TALL Stack specific analysis
         tall_keywords = {
@@ -523,6 +528,13 @@ class AIRouter:
             
             # Enhanced scoring logic
             
+
+            # Default model preferences - Claude Opus 4 is the premier model for coding
+            if "claude-opus-4" in model.name:
+                score += 55  # Claude Opus 4 is the premier model for coding tasks
+            elif model.name == "gpt-5":
+                score += 45  # GPT-5 is excellent but Opus 4 leads for coding
+
             # User preference override - respect user's preferred default model
             preferred_default = self.config.get_preference("preferred_default_model", "gpt-5")
             if preferred_default != "auto":
@@ -541,10 +553,10 @@ class AIRouter:
             
             # TALL Stack specialization bonus
             if analysis.get("tall_stack", 0) > 0.3:
-                if model.name == "gpt-5":
-                    score += 20  # GPT-5 gets top priority for TALL stack
-                elif "claude-opus-4" in model.name:
-                    score += 18  # Claude Opus 4 is excellent for TALL stack
+                if "claude-opus-4" in model.name:
+                    score += 25  # Claude Opus 4 gets top priority for TALL stack
+                elif model.name == "gpt-5":
+                    score += 20  # GPT-5 is excellent for TALL stack
                 elif model.provider == "anthropic" and "claude-3-5" in model.name:
                     score += 15  # Claude 3.5 excels at PHP/Laravel
                 elif model.provider == "openai" and "gpt-4o" in model.name:
@@ -552,41 +564,44 @@ class AIRouter:
                 elif model.provider == "google" and "gemini" in model.name:
                     score += 8   # Gemini is decent for web dev
             
-            # Code-specific bonuses
+            # Code-specific bonuses - Claude Opus 4 is premier for coding
             if analysis.get("code", 0) > 0.5:
-                if model.name == "gpt-5":
-                    score += 18  # GPT-5 gets highest priority for code tasks
-                elif "claude-opus-4" in model.name:
-                    score += 15  # Claude Opus 4 is excellent for code
+                if "claude-opus-4" in model.name:
+                    score += 35  # Even higher priority for code tasks
+                elif model.name == "gpt-5":
+                    score += 18  # GPT-5 is excellent for code
                 elif "gpt-4" in model.name or "claude-3" in model.name:
                     score += 10  # Premium models for complex code
                 if model.provider == "anthropic":
                     score += 5   # Anthropic models are great for code
             
-            # Debugging and troubleshooting
+            # Debugging and troubleshooting - Claude Opus 4 leads
             if analysis.get("debugging", 0) > 0.5:
-                if model.name == "gpt-5":
-                    score += 22  # GPT-5 gets top priority for debugging
-                elif "claude-opus-4" in model.name:
-                    score += 20  # Claude Opus 4 is excellent for debugging
+                if "claude-opus-4" in model.name:
+                    score += 35  # Even higher priority for debugging
+                elif model.name == "gpt-5":
+                    score += 22  # GPT-5 is excellent for debugging
                 elif "claude-3-5-sonnet" in model.name:
                     score += 18  # Claude 3.5 Sonnet excels at debugging
                 elif "gpt-4o" in model.name:
                     score += 15
             
-            # Testing and quality assurance
+            # Testing and quality assurance - Claude Opus 4 leads
             if analysis.get("testing", 0) > 0.5:
-                if model.provider == "openai" and "gpt-4" in model.name:
+                if "claude-opus-4" in model.name:
+                    score += 18  # Claude Opus 4 is excellent for testing
+                elif model.provider == "openai" and "gpt-4" in model.name:
                     score += 12  # GPT-4 models are good for test generation
                 elif "claude-3" in model.name:
                     score += 10
+                    score += 10
             
-            # Architecture and design patterns
+            # Architecture and design patterns - Claude Opus 4 leads
             if analysis.get("architecture", 0) > 0.5:
-                if model.name == "gpt-5":
+                if "claude-opus-4" in model.name:
+                    score += 25  # Claude Opus 4 is excellent for architecture
+                elif model.name == "gpt-5":
                     score += 20  # GPT-5 is excellent for architecture
-                elif "claude-opus-4" in model.name:
-                    score += 18  # Claude Opus 4 is excellent for architectural decisions
                 elif "claude-3-opus" in model.name:
                     score += 16  # Original Opus is excellent for architectural decisions
                 elif "gpt-4" in model.name:
@@ -603,12 +618,12 @@ class AIRouter:
                 elif "gpt-4" in model.name:
                     score += 10
             
-            # Refactoring tasks
+            # Refactoring tasks - Claude Opus 4 leads
             if analysis.get("refactoring", 0) > 0.5:
-                if model.name == "gpt-5":
+                if "claude-opus-4" in model.name:
+                    score += 25  # Claude Opus 4 is excellent for refactoring
+                elif model.name == "gpt-5":
                     score += 20  # GPT-5 is excellent for refactoring
-                elif "claude-opus-4" in model.name:
-                    score += 18  # Claude Opus 4 is excellent for refactoring
                 elif "claude-3-5-sonnet" in model.name:
                     score += 16  # Sonnet is excellent for refactoring
                 elif "gpt-4" in model.name:

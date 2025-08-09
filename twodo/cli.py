@@ -618,7 +618,7 @@ def mcp(interactive, list_servers):
 
 @cli.command("add-ai")
 @click.option('--provider', help='AI provider name (e.g., openai, anthropic, google)')
-@click.option('--model', help='Model name (e.g., gpt-4, claude-3-opus)')
+@click.option('--model', help='Model name (e.g., claude-opus-4, gpt-4, claude-3-opus)')
 @click.option('--api-key', help='API key for the provider')
 @click.option('--list-supported', is_flag=True, help='Show supported models from built-in list')
 def add_ai(provider, model, api_key, list_supported):
@@ -1634,27 +1634,36 @@ def _show_supported_models():
     for provider, model, description in free_models:
         console.print(f"   • [cyan]{provider}[/cyan] - [yellow]{model}[/yellow]: {description}")
     
-    # Premium models (require API keys)
+    # Premium models (require API keys) - Claude 4 models highlighted
     console.print("\n💰 [bold yellow]Premium Models (Require API Keys):[/bold yellow]")
-    premium_models = [
-        ("OpenAI", "gpt-5", "Latest OpenAI model with advanced reasoning (recommended default)"),
-        ("OpenAI", "gpt-4o", "Advanced reasoning and multimodal"),
-        ("OpenAI", "gpt-4", "Complex reasoning and analysis"),
-        ("OpenAI", "gpt-4-turbo", "Large context code analysis"),
-        ("Anthropic", "claude-3-5-sonnet", "Balanced performance"),
-        ("Anthropic", "claude-3-opus", "Advanced reasoning"),
-        ("Google", "gemini-1.5-pro", "Large context multimodal"),
-        ("xAI", "grok-4", "Latest xAI model (if available)"),
-        ("DeepSeek", "deepseek-v3", "Code and reasoning model"),
-        ("Mistral", "mistral-large-2", "Advanced reasoning"),
-        ("Cohere", "command-r-plus", "Enterprise command model"),
-        ("Perplexity", "pplx-70b-online", "Search-augmented model"),
+    console.print("\n🏆 [bold cyan]Claude 4 Models (Premier for Coding):[/bold cyan]")
+    claude_4_models = [
+        ("Anthropic", "claude-opus-4", "🥇 Premier coding model - best for complex development"),
+        ("Anthropic", "claude-sonnet-4", "⭐ Advanced coding and reasoning"),
     ]
+    
+    for provider, model, description in claude_4_models:
+        console.print(f"   • [cyan]{provider}[/cyan] - [bold yellow]{model}[/bold yellow]: {description}")
+    
+    console.print("\n🚀 [bold white]Other Premium Models:[/bold white]")
+    premium_models = [
+    ("OpenAI", "gpt-5-pro",      "Unified next-gen model with expert reasoning, multimodal input, agentic capabilities (highest performance)"),
+    ("OpenAI", "gpt-5",          "High reasoning, multimodal inputs (text, image, audio, video), extended context, free user access with some limits"),
+    ("OpenAI", "gpt-5-mini",     "Cost-optimized variant, lighter and faster"),
+    ("OpenAI", "gpt-5-nano",     "Ultra-light, ultra-fast variant for mobile/low-cost use"),
+    ("Anthropic", "claude-opus-4", "Top coding and deep reasoning model, long-horizon agentic workflows"),
+    ("Anthropic", "claude-sonnet-4", "Balanced efficiency-focused model with strong coding and reasoning"),
+    ("Google", "gemini-2.5-pro", "Massive 1M-token context, multimodal, great for long-context synthesis"),
+    ("xAI", "grok-4",           "Strong code and reasoning, real-time updates, competitive pricing"),
+    ("DeepSeek", "deepseek-r1", "Open-source chain-of-thought model—cost-effective reasoning & code performance"),
+    ("Perplexity", "pplx-70b-online", "Search-augmented model with timely web grounding"),
+]
     
     for provider, model, description in premium_models:
         console.print(f"   • [cyan]{provider}[/cyan] - [yellow]{model}[/yellow]: {description}")
     
     console.print(f"\n💡 Use [bold]2do add-ai[/bold] to add any of these models with your API key")
+    console.print(f"🏆 [bold cyan]Recommended for coding:[/bold cyan] Claude Opus 4 models offer the best performance for development tasks!")
 
 
 def _interactive_add_ai(config_manager):
