@@ -29,13 +29,20 @@ class MCPClient:
         try:
             # Use explicitly passed project_path first, then fall back to cwd
             if project_path:
-                base_path = Path(project_path).resolve()
-                console.print(f"🔍 DEBUG: Using explicit project_path: {project_path} -> {base_path}")
+                initial_path = Path(project_path).resolve()
+                console.print(f"🔍 DEBUG: Using explicit project_path: {project_path} -> {initial_path}")
             else:
-                base_path = Path.cwd()
-                console.print(f"🔍 DEBUG: Using cwd fallback: {base_path}")
+                initial_path = Path.cwd()
+                console.print(f"🔍 DEBUG: Using cwd fallback: {initial_path}")
             
-            console.print(f"🎯 Using explicit project path: {base_path}")
+            # Find the Git repository root to enforce scope restrictions
+            git_root = self._find_git_repository_root(initial_path)
+            base_path = git_root
+            
+            if git_root != initial_path:
+                console.print(f"🔍 Found Git repository root: {git_root} (from {initial_path})")
+            
+            console.print(f"🎯 Using Git repository root as base path: {base_path}")
             
             # Request project permissions from session manager
             if not self.permission_manager.current_session:
@@ -94,6 +101,45 @@ class MCPClient:
             
         except Exception as e:
             console.print(f"❌ Failed to initialize filesystem MCP server: {e}")
+            return False
+    
+    def _find_git_repository_root(self, start_path: Path) -> Path:
+        """Find the Git repository root by walking up the directory tree"""
+        current_path = Path(start_path).resolve()
+        
+        while current_path != current_path.parent:
+            if (current_path / '.git').exists():
+                return current_path
+            current_path = current_path.parent
+        
+        # If no .git found, return the original path
+        return Path(start_path).resolve()
+    
+    def _is_path_within_repo_scope(self, file_path: str, repo_root: Path) -> bool:
+        """Check if file path is within repository scope and not in excluded directories"""
+        try:
+            target_path = Path(file_path).resolve()
+            
+            # Check if path is within repository root
+            try:
+                target_path.relative_to(repo_root)
+            except ValueError:
+                console.print(f"⚠️ Path outside repository scope: {target_path}")
+                return False
+            
+            # Check for excluded directories (node_modules, vendor)
+            excluded_dirs = {'node_modules', 'vendor'}
+            path_parts = target_path.parts
+            
+            for part in path_parts:
+                if part in excluded_dirs:
+                    console.print(f"⚠️ Path in excluded directory ({part}): {target_path}")
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            console.print(f"⚠️ Error validating path scope: {e}")
             return False
     
     def _is_legitimate_project_directory(self, path: Path) -> bool:
@@ -740,8 +786,21 @@ class MCPClient:
         return False
     
     async def _validate_file_operation(self, file_path: str, operation: str) -> None:
-        """Enhanced validation with session-based permissions"""
-        # First check traditional restrictions
+        """Enhanced validation with session-based permissions and repository scope"""
+        # First check repository scope restrictions
+        if hasattr(self, 'filesystem_server') and self.filesystem_server:
+            repo_root = Path(self.filesystem_server['base_path'])
+            git_root = self._find_git_repository_root(repo_root)
+            
+            if not self._is_path_within_repo_scope(file_path, git_root):
+                scope_msg = (
+                    f"❌ SCOPE VIOLATION: {operation} operation blocked on '{file_path}'. "
+                    f"All file operations must be within the Git repository scope ({git_root}) "
+                    f"and cannot access node_modules/ or vendor/ directories."
+                )
+                raise PermissionError(scope_msg)
+        
+        # Then check traditional restrictions (legacy support)
         if self._is_restricted_path(file_path):
             restricted_msg = (
                 f"❌ RESTRICTED: {operation} operation blocked on '{file_path}'. "
