@@ -17,6 +17,7 @@ import click
 import os
 import yaml
 import json
+import time
 from pathlib import Path
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
@@ -34,7 +35,8 @@ from .github_integration import GitHubIntegration
 from .browser_integration import BrowserIntegration
 from .image_handler import ImageHandler
 from .intent_router import IntentRouter
-from .permission_manager import PermissionManager, diagnose_permissions
+from .permission_manager import PermissionManager, diagnose_permissions, get_session_permission_manager
+from .enhanced_file_handler import get_enhanced_file_handler
 from .automation_engine import AutomationEngine
 
 from .setup_guide import SetupGuide
@@ -48,14 +50,56 @@ from .scheduler import Scheduler
 console = Console()
 
 def _is_terminal_interactive():
-    """Check if we're in an interactive terminal"""
+    """Enhanced terminal interactivity detection (handles curl | bash correctly)"""
     import sys
+    
+    # Check if stdout and stderr are terminals (even if stdin is piped)
+    if os.isatty(1) and os.isatty(2):
+        # Check if we're NOT in a CI environment
+        if not any(env in os.environ for env in ['CI', 'GITHUB_ACTIONS', 'JENKINS_URL', 'GITLAB_CI']):
+            # Try to access controlling terminal directly
+            try:
+                return os.path.exists('/dev/tty')
+            except:
+                pass
+    
     return sys.stdin.isatty() and sys.stdout.isatty()
 
+def _read_from_terminal(prompt_text: str, password: bool = False) -> str:
+    """Read input from controlling terminal (works with curl | bash)"""
+    if _is_terminal_interactive():
+        try:
+            # Try to read from controlling terminal
+            with open('/dev/tty', 'r') as tty_in:
+                # Write prompt to stderr (which should be connected to terminal)
+                import sys
+                sys.stderr.write(prompt_text)
+                sys.stderr.flush()
+                
+                if password:
+                    import getpass
+                    return getpass.getpass("", stream=tty_in)
+                else:
+                    return tty_in.readline().strip()
+        except:
+            pass
+    
+    # Fallback to regular prompt
+    if password:
+        import getpass
+        return getpass.getpass(prompt_text)
+    else:
+        return input(prompt_text).strip()
+
 def _safe_confirm(message, default=False):
-    """Safely ask for confirmation with fallback"""
+    """Enhanced confirmation with better terminal detection"""
     try:
-        return Confirm.ask(message, default=default)
+        if _is_terminal_interactive():
+            return Confirm.ask(message, default=default)
+        else:
+            # In non-interactive mode, return default
+            console.print(f"⚠️ Non-interactive mode: {message} [default: {default}]")
+            return default
     except (KeyboardInterrupt, EOFError):
         raise
     except Exception:
@@ -64,10 +108,18 @@ def _safe_confirm(message, default=False):
         return default
 
 def _safe_prompt(message, password=False, default=""):
-    """Safely prompt for input with fallback"""
+    """Enhanced prompting with better terminal detection"""
     try:
-        result = Prompt.ask(message, password=password, default=default)
-        return result.strip() if result else ""
+        if _is_terminal_interactive():
+            if password:
+                result = _read_from_terminal(f"{message}: ", password=True)
+            else:
+                result = Prompt.ask(message, default=default)
+            return result.strip() if result else default
+        else:
+            # In non-interactive mode, return default
+            console.print(f"⚠️ Non-interactive mode: {message} [default: {default}]")
+            return default
     except (KeyboardInterrupt, EOFError):
         raise
     except Exception:
@@ -1871,6 +1923,286 @@ def smart_todo(request):
         
     except Exception as e:
         console.print(f"❌ Error creating smart todo: {e}")
+
+@cli.command()
+@click.option('--session-id', help='Specific session ID to show')
+def permissions(session_id):
+    """Manage file access permissions and sessions"""
+    console.print(Panel.fit("🔐 Permission Management", style="bold blue"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        
+        # Get session permission manager
+        session_manager = get_session_permission_manager(config_manager.config_dir)
+        
+        if session_id:
+            # Show specific session
+            session = session_manager.get_session(session_id)
+            if session:
+                perms = session_manager.list_permissions()
+                console.print(f"\n📋 Session: {session_id}")
+                console.print(f"Created: {time.ctime(perms['created_at'])}")
+                console.print(f"Last used: {time.ctime(perms['last_used'])}")
+                console.print(f"Allowed paths: {len(perms['allowed_paths'])}")
+                console.print(f"Allowed patterns: {len(perms['allowed_patterns'])}")
+                
+                if perms['allowed_paths']:
+                    console.print("\n📁 Allowed Paths:")
+                    for path in list(perms['allowed_paths'])[:10]:
+                        read_access = "R" if path in perms['read_permissions'] else "-"
+                        write_access = "W" if path in perms['write_permissions'] else "-"
+                        execute_access = "X" if path in perms['execute_permissions'] else "-"
+                        console.print(f"  {read_access}{write_access}{execute_access} {path}")
+                
+                if perms['allowed_patterns']:
+                    console.print("\n🔍 Allowed Patterns:")
+                    for pattern in list(perms['allowed_patterns'])[:10]:
+                        read_access = "R" if pattern in perms['read_permissions'] else "-"
+                        write_access = "W" if pattern in perms['write_permissions'] else "-"
+                        execute_access = "X" if pattern in perms['execute_permissions'] else "-"
+                        console.print(f"  {read_access}{write_access}{execute_access} {pattern}")
+            else:
+                console.print(f"❌ Session {session_id} not found")
+        else:
+            # Show current session and general permissions info
+            if session_manager.current_session:
+                perms = session_manager.list_permissions()
+                console.print(f"\n📋 Current Session: {perms['session_id']}")
+                console.print(f"Created: {time.ctime(perms['created_at'])}")
+                console.print(f"Last used: {time.ctime(perms['last_used'])}")
+                console.print(f"Allowed paths: {len(perms['allowed_paths'])}")
+                console.print(f"Allowed patterns: {len(perms['allowed_patterns'])}")
+                
+                # Show interactive options
+                console.print("\n🎯 Permission Actions:")
+                console.print("1. Grant project permissions for current directory")
+                console.print("2. Clear current session")
+                console.print("3. View detailed permissions")
+                console.print("4. Exit")
+                
+                choice = _safe_prompt("Choose action (1-4)", default="4")
+                
+                if choice == "1":
+                    success = session_manager.grant_project_permissions(working_dir)
+                    if success:
+                        console.print("✅ Project permissions granted")
+                    else:
+                        console.print("❌ Failed to grant project permissions")
+                
+                elif choice == "2":
+                    session_manager.clear_session()
+                    console.print("✅ Session cleared")
+                
+                elif choice == "3":
+                    # Show detailed permissions
+                    if perms['allowed_paths']:
+                        console.print("\n📁 Detailed Path Permissions:")
+                        for path in perms['allowed_paths']:
+                            permissions = []
+                            if path in perms['read_permissions']:
+                                permissions.append("read")
+                            if path in perms['write_permissions']:
+                                permissions.append("write")
+                            if path in perms['execute_permissions']:
+                                permissions.append("execute")
+                            console.print(f"  {path}: {', '.join(permissions) if permissions else 'none'}")
+            else:
+                console.print("📝 No active permission session")
+                console.print("💡 A session will be created automatically when needed")
+        
+        # Always show system permission status
+        console.print("\n" + "="*50)
+        diagnose_permissions()
+        
+    except Exception as e:
+        console.print(f"❌ Error managing permissions: {e}")
+
+
+@cli.command()
+@click.option('--clear-all', is_flag=True, help='Clear all permission sessions')
+@click.option('--session-id', help='Clear specific session')
+def clear_permissions(clear_all, session_id):
+    """Clear permission sessions"""
+    console.print(Panel.fit("🗑️ Clear Permissions", style="bold red"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        session_manager = get_session_permission_manager(config_manager.config_dir)
+        
+        if clear_all:
+            if _safe_confirm("Clear ALL permission sessions?", default=False):
+                # Clear all sessions
+                session_count = len(session_manager.sessions)
+                session_manager.sessions.clear()
+                session_manager.current_session = None
+                session_manager._save_sessions()
+                console.print(f"✅ Cleared {session_count} permission sessions")
+            else:
+                console.print("❌ Operation cancelled")
+        
+        elif session_id:
+            session_manager.clear_session(session_id)
+            console.print(f"✅ Cleared session: {session_id}")
+        
+        else:
+            # Clear current session
+            if session_manager.current_session:
+                session_id = session_manager.current_session.session_id
+                session_manager.clear_session()
+                console.print(f"✅ Cleared current session: {session_id}")
+            else:
+                console.print("📝 No active session to clear")
+        
+    except Exception as e:
+        console.print(f"❌ Error clearing permissions: {e}")
+
+
+@cli.command()
+@click.argument('path')
+@click.option('--read', is_flag=True, help='Grant read permission')
+@click.option('--write', is_flag=True, help='Grant write permission')
+@click.option('--execute', is_flag=True, help='Grant execute permission')
+def grant_permission(path, read, write, execute):
+    """Grant specific permissions for a path"""
+    console.print(Panel.fit("✅ Grant Permission", style="bold green"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        session_manager = get_session_permission_manager(config_manager.config_dir)
+        
+        if not session_manager.current_session:
+            session_manager.create_session()
+        
+        # Default to read permission if none specified
+        if not any([read, write, execute]):
+            read = True
+        
+        # Add the permission
+        session_manager.current_session.add_path_permission(
+            path, read=read, write=write, execute=execute
+        )
+        session_manager._save_sessions()
+        
+        permissions = []
+        if read:
+            permissions.append("read")
+        if write:
+            permissions.append("write")
+        if execute:
+            permissions.append("execute")
+        
+        console.print(f"✅ Granted {', '.join(permissions)} permission for: {path}")
+        
+    except Exception as e:
+        console.print(f"❌ Error granting permission: {e}")
+
+
+@cli.command()
+@click.argument('files', nargs=-1, required=True)
+@click.option('--no-cache', is_flag=True, help='Skip cache for reading')
+@click.option('--no-progress', is_flag=True, help='Hide progress indicators')
+def fast_read(files, no_cache, no_progress):
+    """Fast file reading with caching and progress indicators"""
+    console.print(Panel.fit("⚡ Fast File Reading", style="bold green"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        session_manager = get_session_permission_manager(config_manager.config_dir)
+        file_handler = get_enhanced_file_handler(session_manager)
+        
+        async def read_files():
+            if len(files) == 1:
+                # Single file
+                content = await file_handler.read_file_fast(
+                    files[0], show_progress=not no_progress
+                )
+                console.print(f"\n📄 Content of {files[0]}:")
+                console.print(Panel(content[:1000] + ("..." if len(content) > 1000 else ""), 
+                                  title=Path(files[0]).name))
+            else:
+                # Multiple files
+                results = await file_handler.batch_read_files(list(files))
+                console.print(f"\n📚 Read {len(results)} files:")
+                for file_path, content in results.items():
+                    console.print(f"  ✅ {Path(file_path).name}: {len(content)} characters")
+        
+        asyncio.run(read_files())
+        
+    except Exception as e:
+        console.print(f"❌ Error reading files: {e}")
+
+
+@cli.command()
+@click.argument('file_path')
+@click.argument('content')
+@click.option('--no-backup', is_flag=True, help='Skip backup creation')
+@click.option('--no-progress', is_flag=True, help='Hide progress indicators')
+def fast_write(file_path, content, no_backup, no_progress):
+    """Fast file writing with backup and progress indicators"""
+    console.print(Panel.fit("✍️ Fast File Writing", style="bold green"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        session_manager = get_session_permission_manager(config_manager.config_dir)
+        file_handler = get_enhanced_file_handler(session_manager)
+        
+        async def write_file():
+            success = await file_handler.write_file_fast(
+                file_path, content, 
+                show_progress=not no_progress,
+                create_backup=not no_backup
+            )
+            if success:
+                console.print(f"✅ Successfully wrote to {file_path}")
+            else:
+                console.print(f"❌ Failed to write to {file_path}")
+        
+        asyncio.run(write_file())
+        
+    except Exception as e:
+        console.print(f"❌ Error writing file: {e}")
+
+
+@cli.command()
+def file_stats():
+    """Show file operation performance statistics"""
+    console.print(Panel.fit("📊 File Performance Statistics", style="bold blue"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        session_manager = get_session_permission_manager(config_manager.config_dir)
+        file_handler = get_enhanced_file_handler(session_manager)
+        
+        file_handler.show_performance_report()
+        
+    except Exception as e:
+        console.print(f"❌ Error showing file stats: {e}")
+
+
+@cli.command()
+def clear_cache():
+    """Clear file operation cache"""
+    console.print(Panel.fit("🗑️ Clear File Cache", style="bold red"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        session_manager = get_session_permission_manager(config_manager.config_dir)
+        file_handler = get_enhanced_file_handler(session_manager)
+        
+        file_handler.clear_cache()
+        console.print("✅ File cache cleared successfully")
+        
+    except Exception as e:
+        console.print(f"❌ Error clearing cache: {e}")
+
 
 @cli.command()
 def automation_status():

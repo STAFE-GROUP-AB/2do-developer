@@ -1,5 +1,5 @@
 """
-MCP Client - Integrates AI models with Model Context Protocol servers for file operations
+Enhanced MCP Client - Integrates AI models with Model Context Protocol servers with session-based permissions
 """
 
 import asyncio
@@ -9,19 +9,23 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from rich.console import Console
+from .permission_manager import SessionPermissionManager, get_session_permission_manager
 
 console = Console()
 
 class MCPClient:
-    """Client for connecting AI models to MCP servers"""
+    """Enhanced client for connecting AI models to MCP servers with session-based permissions"""
     
     def __init__(self, config_manager=None):
         self.config_manager = config_manager
         self.active_servers = {}
         self.filesystem_server = None
+        self.permission_manager = get_session_permission_manager(
+            config_manager.config_dir if config_manager else None
+        )
         
     async def initialize_filesystem_server(self, project_path: str = None):
-        """Initialize official MCP filesystem server with proper JSON-RPC communication"""
+        """Initialize official MCP filesystem server with session-based permissions"""
         try:
             # Use explicitly passed project_path first, then fall back to cwd
             if project_path:
@@ -32,6 +36,24 @@ class MCPClient:
                 console.print(f"🔍 DEBUG: Using cwd fallback: {base_path}")
             
             console.print(f"🎯 Using explicit project path: {base_path}")
+            
+            # Request project permissions from session manager
+            if not self.permission_manager.current_session:
+                self.permission_manager.create_session()
+            
+            # Auto-grant project permissions if this is a legitimate project directory
+            if self._is_legitimate_project_directory(base_path):
+                console.print(f"📁 Auto-granting project permissions for: {base_path}")
+                self.permission_manager.grant_project_permissions(base_path, auto_approve=True)
+            else:
+                # Request manual permission for non-standard directories
+                granted = self.permission_manager.request_permission(
+                    base_path, 'read', 
+                    reason=f"MCP filesystem server initialization for {base_path}"
+                )
+                if not granted:
+                    console.print(f"❌ Permission denied for filesystem access to {base_path}")
+                    return False
             
             # Start the official MCP filesystem server
             cmd = [
@@ -73,6 +95,31 @@ class MCPClient:
         except Exception as e:
             console.print(f"❌ Failed to initialize filesystem MCP server: {e}")
             return False
+    
+    def _is_legitimate_project_directory(self, path: Path) -> bool:
+        """Check if directory is a legitimate project directory"""
+        # Check for common project indicators
+        project_indicators = [
+            '.git',
+            'package.json',
+            'composer.json',
+            'requirements.txt',
+            'pyproject.toml',
+            'pom.xml',
+            'Cargo.toml',
+            'go.mod',
+            '.gitignore',
+            'Dockerfile',
+            'Makefile',
+            'README.md',
+            'README.rst',
+        ]
+        
+        for indicator in project_indicators:
+            if (path / indicator).exists():
+                return True
+        
+        return False
     
     async def _initialize_mcp_protocol(self, process):
         """Initialize MCP JSON-RPC protocol and get available tools from official server"""
@@ -693,7 +740,8 @@ class MCPClient:
         return False
     
     def _validate_file_operation(self, file_path: str, operation: str) -> None:
-        """Validate that file operation is allowed on this path"""
+        """Enhanced validation with session-based permissions"""
+        # First check traditional restrictions
         if self._is_restricted_path(file_path):
             restricted_msg = (
                 f"❌ RESTRICTED: {operation} operation blocked on '{file_path}'. "
@@ -702,6 +750,23 @@ class MCPClient:
                 f"(composer.json, package.json) can be read for dependency detection."
             )
             raise PermissionError(restricted_msg)
+        
+        # Check session-based permissions
+        if not self.permission_manager.current_session:
+            raise PermissionError(f"No active permission session for {operation} operation on {file_path}")
+        
+        if not self.permission_manager.current_session.has_permission(file_path, operation):
+            # Attempt to request permission interactively
+            granted = asyncio.run(self._request_permission_async(file_path, operation))
+            if not granted:
+                raise PermissionError(f"Permission denied for {operation} operation on {file_path}")
+    
+    async def _request_permission_async(self, file_path: str, operation: str) -> bool:
+        """Async wrapper for permission requests"""
+        return self.permission_manager.request_permission(
+            file_path, operation, 
+            reason=f"AI model requested {operation} access during task execution"
+        )
     
     async def call_filesystem_tool(self, tool_name: str, parameters: Dict[str, Any]) -> str:
         """Call a filesystem tool through the official MCP server"""
