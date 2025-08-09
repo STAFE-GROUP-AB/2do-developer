@@ -154,6 +154,9 @@ class SetupGuide:
             # Optionally configure Google
             if not status["google_configured"] and Confirm.ask("\n🤖 Would you like to configure Google AI (optional)?"):
                 self.configure_google()
+            
+            # Ask user for default model preference
+            self.configure_default_model_preference()
         else:
             self.console.print("\n💡 You can run '2do setup' anytime to configure these components.")
             self.display_manual_setup_instructions(missing_components)
@@ -161,11 +164,12 @@ class SetupGuide:
     def configure_openai(self):
         """Guide OpenAI API key configuration"""
         self.console.print(Panel(
-            "To use OpenAI models (GPT-3.5, GPT-4), you need an API key:\n\n"
+            "To use OpenAI models (GPT-5, GPT-4, GPT-3.5), you need an API key:\n\n"
             "1. Visit: https://platform.openai.com/api-keys\n"
             "2. Sign in or create an account\n"
             "3. Click 'Create new secret key'\n"
-            "4. Copy the key (starts with 'sk-')",
+            "4. Copy the key (starts with 'sk-')\n\n"
+            "💫 GPT-5 is now available and recommended as the default!",
             title="🤖 OpenAI Setup",
             style="blue"
         ))
@@ -240,6 +244,51 @@ class SetupGuide:
             else:
                 self.console.print("⚠️ No token entered. Skipping GitHub configuration.")
     
+    def configure_default_model_preference(self):
+        """Ask user to choose their preferred default AI model"""
+        self.console.print(Panel(
+            "🎯 Choose Your Default AI Model Decision Maker\n\n"
+            "2DO can automatically select the best AI model for each task, "
+            "but you can set your preferred default for decision making.\n\n"
+            "Available options:\n"
+            "• GPT-5: Latest OpenAI model with advanced reasoning (recommended)\n"
+            "• GPT-4o-mini: Fast and cost-effective for general tasks\n"
+            "• Auto: Let 2DO automatically choose the best model for each task",
+            title="🤖 Default Model Preference",
+            style="cyan"
+        ))
+        
+        choices = ["gpt-5", "gpt-4o-mini", "auto"]
+        choice_descriptions = {
+            "gpt-5": "GPT-5 (latest, advanced reasoning)",
+            "gpt-4o-mini": "GPT-4o-mini (fast and cost-effective)", 
+            "auto": "Auto (intelligent model selection)"
+        }
+        
+        # Display options with descriptions
+        for i, choice in enumerate(choices, 1):
+            self.console.print(f"   {i}. {choice_descriptions[choice]}")
+        
+        # Get user preference
+        user_choice = Prompt.ask(
+            "\nWhich would you prefer as your default decision maker?",
+            choices=choices,
+            default="gpt-5"
+        )
+        
+        # Save the preference
+        self.config.set_preference("preferred_default_model", user_choice)
+        
+        if user_choice == "gpt-5":
+            self.console.print("✅ GPT-5 set as your default decision maker!")
+            self.console.print("💡 GPT-5 offers the most advanced reasoning capabilities.")
+        elif user_choice == "gpt-4o-mini":
+            self.console.print("✅ GPT-4o-mini set as your default decision maker!")
+            self.console.print("💡 GPT-4o-mini provides fast and cost-effective AI assistance.")
+        else:
+            self.console.print("✅ Auto-selection enabled!")
+            self.console.print("💡 2DO will intelligently choose the best model for each task.")
+    
     def display_manual_setup_instructions(self, missing_components):
         """Display manual setup instructions for missing components"""
         self.console.print(Panel(
@@ -312,10 +361,11 @@ class SetupGuide:
                 "You can now:\n"
                 "• Run '2do start' to begin an interactive session\n"
                 "• Create and manage todos\n"
-                "• Use AI-powered multitasking\n"
+                "• Use AI-powered multitasking with GPT-5\n"
                 "• Work with GitHub issues\n"
                 "• Analyze tech stacks automatically\n\n"
                 "🤖 AI Model Management:\n"
+                "• GPT-5 is configured as your default decision maker\n"
                 "• Run '2do ai-list' to see available AI models\n"
                 "• Run '2do add-ai' to add more AI providers\n"
                 "• Only free models are enabled by default",

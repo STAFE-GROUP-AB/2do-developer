@@ -7,9 +7,9 @@
 ## 🚀 Why 2DO? Key Benefits
 
 ### ⚡ **Intelligent AI Model Routing**
-Stop guessing which AI model to use! 2DO automatically analyzes your prompts and selects the optimal model from OpenAI (GPT-4, GPT-3.5), Anthropic (Claude), and Google (Gemini). Save money by using cost-effective models for simple tasks and powerful models for complex work.
+Stop guessing which AI model to use! 2DO automatically analyzes your prompts and selects the optimal model from OpenAI (GPT-5, GPT-4, GPT-3.5), Anthropic (Claude), and Google (Gemini). Now featuring **GPT-5 as the recommended default** for advanced reasoning and complex tasks. Save money by using cost-effective models for simple tasks and powerful models for complex work.
 
-*Example: Simple code formatting → Uses Claude Haiku (fast & cheap). Complex architectural decisions → Uses GPT-4 (thorough & powerful).*
+*Example: Simple code formatting → Uses Claude Haiku (fast & cheap). Complex architectural decisions → Uses GPT-5 (latest & most advanced reasoning).*
 
 ### 🎯 **Parallel Task Processing** 
 Process up to 5 AI tasks simultaneously. What used to take 30 minutes now takes 6 minutes. Perfect for batch processing code reviews, documentation, or multiple development tasks.
@@ -128,7 +128,7 @@ cd /your/project
 
 ### 🧠 **Intelligent AI Model Routing**
 - **Advanced prompt analysis**: Uses machine learning-based keyword detection and complexity scoring
-- **Multi-provider ecosystem**: OpenAI (GPT-4o, GPT-4, GPT-3.5), Anthropic (Claude 3.5 Sonnet, Opus, Haiku), Google Gemini
+- **Multi-provider ecosystem**: OpenAI (GPT-5, GPT-4o, GPT-4, GPT-3.5), Anthropic (Claude 3.5 Sonnet, Opus, Haiku), Google Gemini
 - **Dynamic model selection**: Real-time scoring based on 8 factors including speed, cost, context length, and task complexity
 - **Cost optimization**: Automatic selection of cost-effective models for simple tasks (e.g., Haiku for quick responses)
 - **Context-aware routing**: Handles large contexts (up to 200K tokens) with appropriate models
@@ -212,7 +212,7 @@ cd /your/project
 
 #### 🧠 Intelligent AI Model Routing
 The `ai_router.py` module implements sophisticated prompt analysis and model selection:
-- **Multi-provider support**: OpenAI (GPT-4, GPT-3.5), Anthropic (Claude), Google (Gemini)
+- **Multi-provider support**: OpenAI (GPT-5, GPT-4, GPT-3.5), Anthropic (Claude), Google (Gemini)
 - **Dynamic model scoring**: Analyzes prompt complexity, length, and content type
 - **Cost optimization**: Balances performance with API costs
 - **Context management**: Handles large context windows up to 200K tokens
@@ -668,6 +668,7 @@ The 2DO uses sophisticated analysis to route prompts:
 - **Context length**: Long prompts requiring large context windows
 
 ### Model Capabilities
+- **GPT-5**: Latest OpenAI model with advanced reasoning and multimodal capabilities (recommended default)
 - **GPT-4**: Complex reasoning, code analysis, general tasks
 - **GPT-3.5 Turbo**: Speed-optimized for simple tasks
 - **GPT-4 Turbo**: Large context, code-heavy tasks
