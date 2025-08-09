@@ -263,26 +263,17 @@ def verify(project):
         return False
 
 @cli.command()
-@click.option('--repo', '-r', help='GitHub repository or local path to analyze')
-@click.option('--force-analyze', is_flag=True, help='Force re-analysis even if already analyzed')
+@click.option('--repo', help='Path to local repository to analyze')
+@click.option('--force-analyze', is_flag=True, help='Force re-analysis of the repository')
 def start(repo, force_analyze):
-    """Start the 2DO interactive session"""
-    console.print(Panel.fit("🤖 2DO Starting...", style="bold green"))
+    """Start an interactive 2DO session with natural language interface"""
+    console.print(Panel("🤖 2DO Starting...", style="bold cyan"))
     
-    # Start global escape listener
-    with escape_listener():
-        try:
-            _start_interactive_session(repo, force_analyze)
-        except EscapeInterrupt:
-            console.print("\n⚠️ [yellow]Session interrupted by user (Escape key)[/yellow]")
-            console.print("💡 Use '2do start' to begin a new session")
-            return
+    # Run the interactive session directly without escape handler for normal operation
+    _start_interactive_session(repo, force_analyze)
 
 def _start_interactive_session(repo, force_analyze):
     """Internal method for the interactive session logic"""
-    # Check for escape interrupt at key points
-    raise_if_interrupted()
-    
     # Determine the working directory with error handling
     working_dir = repo if repo else _get_safe_working_directory()
     
@@ -298,9 +289,6 @@ def _start_interactive_session(repo, force_analyze):
             console.print(f"❌ Critical error: {e2}")
             console.print("💡 Please run '2do setup' from your home directory")
             return
-    
-    # Check for escape interrupt after configuration
-    raise_if_interrupted()
     
     # Simplified project detection - only show if not in a git repo
     if not config_manager.is_local_project:
