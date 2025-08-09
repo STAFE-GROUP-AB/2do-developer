@@ -618,7 +618,7 @@ def mcp(interactive, list_servers):
 
 @cli.command("add-ai")
 @click.option('--provider', help='AI provider name (e.g., openai, anthropic, google)')
-@click.option('--model', help='Model name (e.g., gpt-4, claude-3-opus)')
+@click.option('--model', help='Model name (e.g., claude-opus-4, gpt-4, claude-3-opus)')
 @click.option('--api-key', help='API key for the provider')
 @click.option('--list-supported', is_flag=True, help='Show supported models from built-in list')
 def add_ai(provider, model, api_key, list_supported):
@@ -1634,9 +1634,20 @@ def _show_supported_models():
     for provider, model, description in free_models:
         console.print(f"   • [cyan]{provider}[/cyan] - [yellow]{model}[/yellow]: {description}")
     
-    # Premium models (require API keys)
+    # Premium models (require API keys) - Claude 4 models highlighted
     console.print("\n💰 [bold yellow]Premium Models (Require API Keys):[/bold yellow]")
+    console.print("\n🏆 [bold cyan]Claude 4 Models (Premier for Coding):[/bold cyan]")
+    claude_4_models = [
+        ("Anthropic", "claude-opus-4", "🥇 Premier coding model - best for complex development"),
+        ("Anthropic", "claude-sonnet-4", "⭐ Advanced coding and reasoning"),
+    ]
+    
+    for provider, model, description in claude_4_models:
+        console.print(f"   • [cyan]{provider}[/cyan] - [bold yellow]{model}[/bold yellow]: {description}")
+    
+    console.print("\n🚀 [bold white]Other Premium Models:[/bold white]")
     premium_models = [
+        ("OpenAI", "gpt-5", "Latest OpenAI flagship model"),
         ("OpenAI", "gpt-4o", "Advanced reasoning and multimodal"),
         ("OpenAI", "gpt-4", "Complex reasoning and analysis"),
         ("OpenAI", "gpt-4-turbo", "Large context code analysis"),
@@ -1654,6 +1665,7 @@ def _show_supported_models():
         console.print(f"   • [cyan]{provider}[/cyan] - [yellow]{model}[/yellow]: {description}")
     
     console.print(f"\n💡 Use [bold]2do add-ai[/bold] to add any of these models with your API key")
+    console.print(f"🏆 [bold cyan]Recommended for coding:[/bold cyan] Claude Opus 4 models offer the best performance for development tasks!")
 
 
 def _interactive_add_ai(config_manager):
