@@ -739,7 +739,7 @@ class MCPClient:
                 return True
         return False
     
-    def _validate_file_operation(self, file_path: str, operation: str) -> None:
+    async def _validate_file_operation(self, file_path: str, operation: str) -> None:
         """Enhanced validation with session-based permissions"""
         # First check traditional restrictions
         if self._is_restricted_path(file_path):
@@ -757,7 +757,7 @@ class MCPClient:
         
         if not self.permission_manager.current_session.has_permission(file_path, operation):
             # Attempt to request permission interactively
-            granted = asyncio.run(self._request_permission_async(file_path, operation))
+            granted = await self._request_permission_async(file_path, operation)
             if not granted:
                 raise PermissionError(f"Permission denied for {operation} operation on {file_path}")
     
@@ -776,7 +776,7 @@ class MCPClient:
         # Validate path for all operations that have a path parameter
         file_path = parameters.get("path", parameters.get("source", ""))
         if file_path:
-            self._validate_file_operation(file_path, tool_name)
+            await self._validate_file_operation(file_path, tool_name)
         
         try:
             # Route to official MCP filesystem server tools

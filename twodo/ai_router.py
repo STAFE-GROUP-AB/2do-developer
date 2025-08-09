@@ -1026,7 +1026,7 @@ REMEMBER: You have real file system access - USE IT!
         elif model.provider == "anthropic":
             return await self._process_anthropic(model_name, prompt)
         elif model.provider == "google":
-            return self._process_google(model_name, prompt)
+            return await self._process_google(model_name, prompt)
         elif model.provider in ["xai", "deepseek", "mistral", "cohere", "perplexity"]:
             return self._process_placeholder_provider(model.provider, model_name, prompt)
         else:
@@ -1291,7 +1291,7 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
             else:
                 raise ValueError(f"Anthropic API error: {error_msg}")
     
-    def _process_google(self, model_name: str, prompt: str) -> str:
+    async def _process_google(self, model_name: str, prompt: str) -> str:
         """Process prompt using Google Gemini model"""
         if not GOOGLE_AI_AVAILABLE:
             raise ValueError("Google Generative AI library not available. Please install google-generativeai.")
