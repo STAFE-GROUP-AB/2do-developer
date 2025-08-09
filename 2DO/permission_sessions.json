@@ -35,17 +35,28 @@
     {
       "session_id": "session_1754657705",
       "allowed_paths": [
+        "/Users/andreaskviby/Herd/2do-developer",
         "/home/runner/work/2do-developer/2do-developer/test_file.txt"
       ],
-      "allowed_patterns": [],
+      "allowed_patterns": [
+        "/Users/andreaskviby/Herd/2do-developer/.*",
+        "/Users/andreaskviby/Herd/2do-developer/**/*"
+      ],
       "read_permissions": [
+        "/Users/andreaskviby/Herd/2do-developer/**/*",
+        "/Users/andreaskviby/Herd/2do-developer",
+        "/Users/andreaskviby/Herd/2do-developer/.*",
         "/home/runner/work/2do-developer/2do-developer/test_file.txt"
       ],
-      "write_permissions": [],
+      "write_permissions": [
+        "/Users/andreaskviby/Herd/2do-developer",
+        "/Users/andreaskviby/Herd/2do-developer/.*",
+        "/Users/andreaskviby/Herd/2do-developer/**/*"
+      ],
       "execute_permissions": [],
       "created_at": 1754657705.1535287,
-      "last_used": 1754657705.1535754
+      "last_used": 1754763324.343064
     }
   ],
-  "last_cleanup": 1754657705.1536686
+  "last_cleanup": 1754763324.343225
 }

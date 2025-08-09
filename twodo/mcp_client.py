@@ -30,19 +30,14 @@ class MCPClient:
             # Use explicitly passed project_path first, then fall back to cwd
             if project_path:
                 initial_path = Path(project_path).resolve()
-                console.print(f"🔍 DEBUG: Using explicit project_path: {project_path} -> {initial_path}")
             else:
                 initial_path = Path.cwd()
-                console.print(f"🔍 DEBUG: Using cwd fallback: {initial_path}")
             
             # Find the Git repository root to enforce scope restrictions
             git_root = self._find_git_repository_root(initial_path)
             base_path = git_root
             
-            if git_root != initial_path:
-                console.print(f"🔍 Found Git repository root: {git_root} (from {initial_path})")
-            
-            console.print(f"🎯 Using Git repository root as base path: {base_path}")
+            # Silent git root detection - only show if there's an issue
             
             # Request project permissions from session manager
             if not self.permission_manager.current_session:
@@ -50,7 +45,6 @@ class MCPClient:
             
             # Auto-grant project permissions if this is a legitimate project directory
             if self._is_legitimate_project_directory(base_path):
-                console.print(f"📁 Auto-granting project permissions for: {base_path}")
                 self.permission_manager.grant_project_permissions(base_path, auto_approve=True)
             else:
                 # Request manual permission for non-standard directories
@@ -88,15 +82,12 @@ class MCPClient:
                 tools = await self._initialize_mcp_protocol(process)
                 server_info['tools'] = tools
                 server_info['initialized'] = True
-                console.print(f"✅ Official MCP filesystem server initialized with {len(tools)} tools")
             except Exception as protocol_error:
-                console.print(f"⚠️ MCP protocol initialization failed: {protocol_error}")
-                console.print(f"📋 Using fallback tool definitions for official server")
+                # Silent fallback - only show error if it's critical
                 server_info['tools'] = await self._get_filesystem_tools()
                 server_info['initialized'] = False
             
             self.filesystem_server = server_info
-            console.print(f"✅ Filesystem MCP server initialized for: {base_path}")
             return True
             
         except Exception as e:
@@ -205,7 +196,6 @@ class MCPClient:
                 
                 if response_text:
                     response = json.loads(response_text)
-                    console.print(f"🔧 MCP Initialize response: {response.get('result', {}).get('serverInfo', {}).get('name', 'Unknown')}")
                 else:
                     raise Exception("Empty response from MCP server")
                     
@@ -246,10 +236,6 @@ class MCPClient:
                         }
                         converted_tools.append(converted_tool)
                     
-                    console.print(f"🔧 Retrieved {len(converted_tools)} tools from official MCP server")
-                    for tool in converted_tools:
-                        console.print(f"  - {tool['name']}: {tool['description'][:60]}...")
-                    
                     return converted_tools
                 else:
                     raise Exception("Empty tools response from MCP server")
@@ -273,7 +259,7 @@ class MCPClient:
             
             # Get configured MCP servers from config
             mcp_servers = self.config_manager.get_mcp_servers()
-            console.print(f"🔧 Found {len(mcp_servers)} configured MCP servers")
+            # Silent - found configured MCP servers
             
             # Initialize each configured server
             for server_config in mcp_servers:
@@ -282,21 +268,21 @@ class MCPClient:
                     continue  # Already initialized
                 
                 if server_config.get('enabled', True):
-                    console.print(f"🚀 Initializing {server_name} MCP server...")
+                    # Silent - initializing MCP server
                     success = await self._initialize_mcp_server(server_config, project_path)
                     if success:
-                        console.print(f"✅ {server_name} MCP server initialized")
+                        pass  # Silent - MCP server initialized
                     else:
-                        console.print(f"⚠️ {server_name} MCP server initialization failed")
+                        pass  # Silent - MCP server initialization failed
                 else:
-                    console.print(f"⏭️ Skipping disabled server: {server_name}")
+                    pass  # Silent - skipping disabled server
             
             # Log total tools available
             total_tools = len(self.filesystem_server.get('tools', []))
             for server_data in self.active_servers.values():
                 total_tools += len(server_data.get('tools', []))
             
-            console.print(f"✅ MCP initialization complete - {total_tools} total tools available")
+            # Silent - MCP initialization complete
             
         except Exception as e:
             console.print(f"❌ Error initializing MCP servers: {e}")
@@ -361,7 +347,7 @@ class MCPClient:
                 'initialized': True
             }
             
-            console.print(f"✅ {server_name} server initialized with {len(tools)} tools")
+            # Silent - server initialized with tools
             return True
             
         except Exception as e:
@@ -900,7 +886,7 @@ class MCPClient:
             if not server_info or 'process' not in server_info:
                 raise RuntimeError("Official MCP filesystem server process not available")
             
-            console.print(f"🔧 Calling official MCP tool: {tool_name} with args: {parameters}")
+            # Debug - calling MCP tool (suppressed)
             
             # If MCP protocol is properly initialized, use JSON-RPC
             if server_info.get('initialized', False):
@@ -1145,16 +1131,10 @@ class MCPClient:
             base_path = Path(self.filesystem_server['base_path'])
             full_path = base_path / file_path
             
-            # CRITICAL DEBUG: Print full file path details
-            console.print(f"🔍 READ FILE DEBUG:")
-            console.print(f"   📁 Base path: {base_path}")
-            console.print(f"   📄 Relative path: {file_path}")
-            console.print(f"   📍 Full resolved path: {full_path.resolve()}")
-            console.print(f"   📂 File exists: {full_path.exists()}")
+            # Silent file path validation
             
             if not full_path.exists():
                 error_msg = f"Error: File {file_path} does not exist at {full_path.resolve()}"
-                console.print(f"   ❌ {error_msg}")
                 return error_msg
             
             with open(full_path, 'r', encoding='utf-8') as f:
@@ -1181,13 +1161,8 @@ class MCPClient:
             else:
                 full_path = Path(file_path)
             
-            # CRITICAL DEBUG: Print full file path details
-            console.print(f"🔍 WRITE FILE DEBUG:")
-            console.print(f"   📁 Base path: {self.filesystem_server['base_path'] if self.filesystem_server else 'None'}")
-            console.print(f"   📄 Relative path: {file_path}")
-            console.print(f"   📍 Full resolved path: {full_path.resolve()}")
-            console.print(f"   ✍️  Content length: {len(content)} chars")
-            console.print(f"   📝 Content preview: {content[:100]}{'...' if len(content) > 100 else ''}")
+            # Silent file write validation
+            # Silent content validation
             
             # Create parent directories if needed
             full_path.parent.mkdir(parents=True, exist_ok=True)

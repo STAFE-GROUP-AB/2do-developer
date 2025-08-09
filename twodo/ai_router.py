@@ -1171,7 +1171,7 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
             
             # Execute the filesystem operation via MCP
             try:
-                console.print(f"🔍 DEBUG: Executing MCP tool {function_name} with args: {function_args}")
+                # Silent MCP tool execution
                 result = await self.mcp_client.call_filesystem_tool(function_name, function_args)
                 console.print(f"✅ {function_name} executed successfully - Result: {str(result)[:200]}")
                 

@@ -302,34 +302,27 @@ def _start_interactive_session(repo, force_analyze):
     # Check for escape interrupt after configuration
     raise_if_interrupted()
     
-    if config_manager.is_local_project:
-        console.print(f"📁 Using local 2DO folder in git repository: {working_dir}")
-    else:
+    # Simplified project detection - only show if not in a git repo
+    if not config_manager.is_local_project:
         console.print("🏠 Using global configuration")
     
     if not config_manager.has_api_keys():
         console.print("❌ No API keys configured. Please run '2do setup' first.")
         return
     
-    # Check for GitHub connection
+    # Initialize GitHub connection (silent unless there's an issue)
     github_integration = GitHubIntegration(config_manager.get_api_key("github"))
-    if github_integration.github:
-        console.print("✅ GitHub connection established")
     
     ai_router = AIRouter(config_manager)
     
-    # Initialize MCP filesystem server for file operations
-    console.print("🔌 Initializing filesystem server for file operations...")
+    # Initialize MCP filesystem server (silent initialization)
     try:
         import asyncio
         filesystem_success = asyncio.run(ai_router.initialize_filesystem(working_dir))
-        if filesystem_success:
-            console.print("✅ Filesystem server initialized - AI can now modify files locally!")
-        else:
-            console.print("⚠️ Filesystem server initialization failed - AI will provide suggestions only")
+        if not filesystem_success:
+            console.print("⚠️ File operations limited - install Node.js for full functionality")
     except Exception as e:
-        console.print(f"⚠️ Filesystem server setup error: {e}")
-        console.print("💡 AI will provide suggestions only. Install Node.js and npm for file operations.")
+        console.print("⚠️ File operations limited - install Node.js for full functionality")
     
     todo_manager = TodoManager(config_manager.config_dir)
     multitasker = Multitasker(ai_router, todo_manager)
@@ -340,15 +333,13 @@ def _start_interactive_session(repo, force_analyze):
     
     # Initialize the automation engine with smart todo parsing and GitHub Pro mode
     automation_engine = AutomationEngine(todo_manager, multitasker, github_integration)
-    console.print("🤖 Smart automation engine initialized!")
     
     # Get repository info if we're in a git repo
     repo_info = None
     if config_manager.is_local_project:
         repo_info = github_integration.get_repository_info(working_dir)
         if repo_info:
-            console.print(f"📁 GitHub repository detected: {repo_info['full_name']}")
-            console.print(f"🌿 Current branch: {repo_info['current_branch']}")
+            console.print(f"📁 {repo_info['full_name']} ({repo_info['current_branch']})")
 
     # Handle repository analysis with memory
     tech_stack = []
@@ -364,27 +355,24 @@ def _start_interactive_session(repo, force_analyze):
             tech_stack = last_analysis.get("tech_stack", [])
             
             if tech_stack:
-                console.print(f"📁 Repository previously analyzed: {analysis_path}")
-                console.print(f"🔍 Using cached tech stack: {', '.join(tech_stack)}")
-                console.print("💡 Use --force-analyze to re-analyze or run '2do analyze'")
+                console.print(f"🔍 Tech stack: {', '.join(tech_stack)}")
             else:
                 # Fallback to checking existing memory files
                 tech_stack = tech_detector.get_existing_analysis()
                 if tech_stack:
-                    console.print(f"📁 Found existing analysis: {', '.join(tech_stack)}")
+                    console.print(f"🔍 Tech stack: {', '.join(tech_stack)}")
                     config_manager.save_analysis_results(tech_stack, memory_files_created=True)
         
         if not tech_stack or force_analyze:
             # Run fresh analysis
-            console.print(f"📁 Analyzing repository: {analysis_path}")
+            console.print("🔍 Analyzing repository...")
             tech_stack = tech_detector.analyze_repo(analysis_path, force_reanalyze=force_analyze)
-            console.print(f"🔍 Detected tech stack: {', '.join(tech_stack)}")
+            console.print(f"🔍 Tech stack: {', '.join(tech_stack)}")
             
             # Create memory files for tech stack
             memory_files_created = False
             if tech_stack and Confirm.ask(f"Create memory files for {', '.join(tech_stack)}?"):
                 tech_detector.create_memory_files(tech_stack)
-                console.print("💾 Memory files created")
                 memory_files_created = True
             
             # Save analysis results

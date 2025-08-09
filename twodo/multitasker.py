@@ -142,11 +142,11 @@ class Multitasker:
     
     async def start_multitask(self, todos: List[Dict]):
         """Start multitasking processing of todos with sub-task awareness"""
-        console.print(f"🔍 DEBUG: start_multitask called with {len(todos) if todos else 0} todos")
+        # Silent multitask initialization
         
         if not todos:
             console.print("No todos to process")
-            console.print("🔍 DEBUG: Returning success=False due to no todos")
+            # No todos to process
             return {"success": False, "message": "No todos to process"}
         
         # Analyze todos for sub-task relationships
@@ -162,19 +162,19 @@ class Multitasker:
             from rich.prompt import Prompt, Confirm
             
             if Confirm.ask("Process parent todos and sub-tasks hierarchically (parents first)?"):
-                console.print("🔍 DEBUG: Processing hierarchically")
+                # Processing hierarchically
                 await self._process_hierarchical_async(parent_todos, sub_todos)
-                console.print("🔍 DEBUG: Hierarchical processing complete, returning success=True")
+                # Hierarchical processing complete
                 return {"success": True, "message": "Hierarchical processing completed"}
         
         # Run async processing
-        console.print("🔍 DEBUG: Starting parallel processing")
+        # Starting parallel processing
         results = await self._process_todos_parallel(todos)
-        console.print(f"🔍 DEBUG: Parallel processing complete, got {len(results) if results else 0} results")
+        # Parallel processing complete
         
         # Display results
         self._display_results(results)
-        console.print("🔍 DEBUG: Results displayed, returning success=True")
+        # Results displayed
         return {"success": True, "message": f"Processed {len(results)} todos", "results": results}
     
     def _process_hierarchical(self, parent_todos: List[Dict], sub_todos: List[Dict]):
