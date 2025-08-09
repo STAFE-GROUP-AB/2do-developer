@@ -1637,6 +1637,7 @@ def _show_supported_models():
     # Premium models (require API keys)
     console.print("\n💰 [bold yellow]Premium Models (Require API Keys):[/bold yellow]")
     premium_models = [
+        ("OpenAI", "gpt-5", "Latest OpenAI model with advanced reasoning (recommended default)"),
         ("OpenAI", "gpt-4o", "Advanced reasoning and multimodal"),
         ("OpenAI", "gpt-4", "Complex reasoning and analysis"),
         ("OpenAI", "gpt-4-turbo", "Large context code analysis"),
