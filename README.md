@@ -4,6 +4,166 @@
 
 🤖 **2DO** is an intelligent command line tool that automatically selects the best AI model for your prompts and enables powerful multitasking capabilities for developers.
 
+## 🚀 Why 2DO? Key Benefits
+
+### ⚡ **Intelligent AI Model Routing**
+Stop guessing which AI model to use! 2DO automatically analyzes your prompts and selects the optimal model from OpenAI (GPT-4, GPT-3.5), Anthropic (Claude), and Google (Gemini). Save money by using cost-effective models for simple tasks and powerful models for complex work.
+
+### 🎯 **Parallel Task Processing** 
+Process up to 5 AI tasks simultaneously. What used to take 30 minutes now takes 6 minutes. Perfect for batch processing code reviews, documentation, or multiple development tasks.
+
+### 🌐 **Smart Development Integration**
+Automatically detects your project type (React, Laravel, Django, etc.) and starts the right development server. See your AI-generated changes instantly in your browser with auto-refresh.
+
+### 📋 **Advanced Todo Management**
+Transform your development workflow with intelligent todo management, GitHub integration, and automatic task breakdown for complex projects.
+
+### 🔧 **25+ Technology Detection**
+Instantly understands your tech stack (Python, JavaScript, React, Laravel, Docker, etc.) and provides contextually-aware AI assistance tailored to your specific technologies.
+
+## 🛠️ Installation
+
+### 🚀 **Quick Install (Recommended)**
+
+**For macOS and Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.sh | bash
+```
+
+**For Windows (PowerShell):**
+```powershell
+iwr -useb https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.ps1 | iex
+```
+
+### ✅ **What the Installer Does**
+
+Our smart installation system provides a comprehensive, automated setup:
+
+- ✅ **Auto-detects your OS**: Windows, macOS, or Linux distribution
+- ✅ **Validates Python 3.8+**: Guides you through Python installation if needed
+- ✅ **Creates isolated environment**: Clean installation in `~/.2do` directory
+- ✅ **Installs all dependencies**: Handles all Python packages automatically
+- ✅ **Configures PATH**: Adds `2do` command to your shell
+- ✅ **Runs setup wizard**: Guides you through API key configuration
+
+### 📦 **Alternative Installation Methods**
+
+#### **Manual Installation (Git Clone)**
+```bash
+# Clone and install
+git clone https://github.com/STAFE-GROUP-AB/2do-developer.git
+cd 2do-developer
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -e .
+
+# Verify installation
+2do --help
+```
+
+#### **Direct pip Install**
+```bash
+pip install git+https://github.com/STAFE-GROUP-AB/2do-developer.git
+```
+
+### 🌍 **Platform-Specific Notes**
+
+#### **macOS Users**
+- Requires Homebrew for some dependencies: `brew install python@3.10`
+- Works on both Intel and Apple Silicon (M1/M2) Macs
+
+#### **Windows Users**  
+- Requires PowerShell (built into Windows 10+)
+- Windows Package Manager (winget) or Chocolatey recommended for Python
+
+#### **Linux Users**
+- Supports Ubuntu, Debian, CentOS, RHEL, Fedora, Arch Linux
+- Uses your distribution's package manager (apt, dnf, pacman)
+
+### ✅ **Verify Installation**
+```bash
+# Check installation
+2do --version
+
+# Run setup wizard
+2do setup
+
+# Start using 2DO
+2do start
+```
+
+## 🚀 Quick Start
+
+### 1. **Initial Setup**
+```bash
+# Configure AI APIs and GitHub integration
+2do setup
+```
+
+### 2. **Start Your First Session**
+```bash
+# In any project directory
+cd /your/project
+2do start
+```
+
+### 3. **Key Features to Try**
+- **add-todo**: Create intelligent todos with priority levels
+- **start-multitask**: Process multiple todos in parallel  
+- **start-browser**: Auto-detect project and start dev server
+- **chat**: Interactive AI chat with automatic model selection
+- **github-issues**: Work with GitHub issues directly
+
+## 🎯 Core Features
+
+### 🧠 **Intelligent AI Model Routing**
+- **Advanced prompt analysis**: Uses machine learning-based keyword detection and complexity scoring
+- **Multi-provider ecosystem**: OpenAI (GPT-4o, GPT-4, GPT-3.5), Anthropic (Claude 3.5 Sonnet, Opus, Haiku), Google Gemini
+- **Dynamic model selection**: Real-time scoring based on 8 factors including speed, cost, context length, and task complexity
+- **Cost optimization**: Automatic selection of cost-effective models for simple tasks (e.g., Haiku for quick responses)
+- **Context-aware routing**: Handles large contexts (up to 200K tokens) with appropriate models
+
+### ⚡ **Multitasking Engine**
+- **Concurrent processing**: Parallel execution of up to 5 simultaneous AI tasks using asyncio
+- **Intelligent load balancing**: Distributes tasks across available AI models based on capabilities
+- **Real-time progress tracking**: Rich-powered progress bars with task status and ETA
+- **Model-aware scheduling**: Routes different task types to optimal models simultaneously
+- **Error resilience**: Graceful handling of API failures with retry mechanisms and fallbacks
+
+### 🌐 **Browser Integration**
+- **Smart project detection**: Automatically identifies 8+ project types (React, Vue, Angular, Next.js, Laravel, Django, Flask, static HTML)
+- **Development server automation**: Starts appropriate servers with correct ports and configurations
+- **Real-time synchronization**: Auto-refreshes browser after task completion for immediate visual feedback
+- **Port conflict resolution**: Intelligent port management with fallback mechanisms
+- **Multi-platform support**: Works on Windows, macOS, and Linux development environments
+
+### 📋 **Advanced Todo Management**
+- **Comprehensive todo system**: Create, manage, and track tasks across multiple types (code, text, image, general)
+- **Priority-based organization**: Four-tier priority system (low, medium, high, critical) with visual indicators
+- **Intelligent sub-task creation**: AI-powered task breakdown based on complexity analysis (500+ character detection)
+- **Parent-child relationships**: Hierarchical todo structure with dependency tracking
+- **Project-specific todos**: Local 2DO folders for repository-specific task management
+
+### 🔧 **Tech Stack Detection & Memory**
+- **Comprehensive technology recognition**: Detects 25+ technologies including languages, frameworks, and tools
+- **Advanced pattern matching**: Analyzes file extensions, configuration files, and package dependencies  
+- **TALL stack specialization**: Deep integration with TailwindCSS, Alpine.js, Laravel, Livewire ecosystem
+- **Memory file generation**: Creates intelligent context files optimized for each detected technology
+- **Best practices integration**: Provides technology-specific recommendations and code patterns
+
+### 🔌 **GitHub Integration**
+- **Complete GitHub API integration**: Read, create, and manage issues and pull requests directly from CLI
+- **Automated workflow management**: Branch creation, switching, and PR generation with proper issue linking
+- **Repository analysis**: Deep inspection of GitHub repositories for technology detection and todo generation
+- **Issue-driven development**: Convert GitHub issues to todos and vice versa with full metadata preservation
+- **Advanced export capabilities**: Export todos as GitHub issues with sub-task linking and label management
+
+### 🖼️ **Image Support & Advanced Features**
+- **Image-enhanced chat**: Include images in chat prompts using file paths with automatic model routing
+- **Markdown task parser**: Extract tasks from markdown files using various formats (checkboxes, TODO: format)
+- **MCP server integration**: Intelligent server recommendations and management based on tech stack analysis
+- **Auto-update system**: Built-in update mechanism with multiple installation method support
+
 ## 🏗️ Repository Architecture
 
 ### Technical Overview
@@ -67,85 +227,6 @@ The `browser_integration.py` module automates development servers:
 - **Server management**: Starts appropriate development servers automatically  
 - **Browser automation**: Opens and refreshes browsers after task completion
 - **Port management**: Handles port conflicts and fallback options
-
-## Features
-
-### 🎯 Intelligent AI Model Routing
-- **Advanced prompt analysis**: Uses machine learning-based keyword detection and complexity scoring
-- **Multi-provider ecosystem**: OpenAI (GPT-4o, GPT-4, GPT-3.5), Anthropic (Claude 3.5 Sonnet, Opus, Haiku), Google Gemini
-- **Dynamic model selection**: Real-time scoring based on 8 factors including speed, cost, context length, and task complexity
-- **Cost optimization**: Automatic selection of cost-effective models for simple tasks (e.g., Haiku for quick responses)
-- **Context-aware routing**: Handles large contexts (up to 200K tokens) with appropriate models
-- **Performance tracking**: Monitors model performance and adjusts recommendations over time
-
-### 🌐 Browser Integration
-- **Smart project detection**: Automatically identifies 8+ project types (React, Vue, Angular, Next.js, Laravel, Django, Flask, static HTML)
-- **Development server automation**: Starts appropriate servers with correct ports and configurations
-- **Real-time synchronization**: Auto-refreshes browser after task completion for immediate visual feedback
-- **Port conflict resolution**: Intelligent port management with fallback mechanisms
-- **Process lifecycle management**: Clean startup, monitoring, and shutdown of development servers
-- **Multi-platform support**: Works on Windows, macOS, and Linux development environments
-
-### 📋 Advanced Todo Management
-- **Comprehensive todo system**: Create, manage, and track tasks across multiple types (code, text, image, general)
-- **Priority-based organization**: Four-tier priority system (low, medium, high, critical) with visual indicators
-- **Intelligent sub-task creation**: AI-powered task breakdown based on complexity analysis (500+ character detection)
-- **Parent-child relationships**: Hierarchical todo structure with dependency tracking
-- **Status lifecycle management**: Full workflow from pending → in_progress → completed/failed
-- **Persistent storage**: JSON-based storage with atomic file operations and backup mechanisms
-- **Project-specific todos**: Local 2DO folders for repository-specific task management
-- **Automatic todo generation**: Creates relevant todos from repository analysis and tech stack detection
-
-### ⚡ Multitasking Engine
-- **Concurrent processing**: Parallel execution of up to 5 simultaneous AI tasks using asyncio
-- **Intelligent load balancing**: Distributes tasks across available AI models based on capabilities
-- **Real-time progress tracking**: Rich-powered progress bars with task status and ETA
-- **Model-aware scheduling**: Routes different task types to optimal models simultaneously
-- **Error resilience**: Graceful handling of API failures with retry mechanisms and fallbacks
-- **Result aggregation**: Combines and presents results from multiple parallel operations
-- **Resource optimization**: Memory and API quota management for efficient processing
-
-### 🔧 Tech Stack Detection & Memory
-- **Comprehensive technology recognition**: Detects 25+ technologies including languages, frameworks, and tools
-- **Advanced pattern matching**: Analyzes file extensions, configuration files, and package dependencies  
-- **TALL stack specialization**: Deep integration with TailwindCSS, Alpine.js, Laravel, Livewire ecosystem
-- **Memory file generation**: Creates intelligent context files optimized for each detected technology
-- **Dependency analysis**: Parses package.json, requirements.txt, composer.json, pom.xml, and more
-- **Project profiling**: Generates comprehensive project profiles for optimal AI model context
-- **Best practices integration**: Provides technology-specific recommendations and code patterns
-
-### 📁 Local Project Management
-- Detects git repositories and creates local 2DO folders for project-specific settings
-- Stores project memory and configuration locally when working in git repositories
-- Seamless switching between global and project-specific configurations
-
-### 🔌 GitHub Integration
-- **Complete GitHub API integration**: Read, create, and manage issues and pull requests directly from CLI
-- **Automated workflow management**: Branch creation, switching, and PR generation with proper issue linking
-- **Repository analysis**: Deep inspection of GitHub repositories for technology detection and todo generation
-- **Issue-driven development**: Convert GitHub issues to todos and vice versa with full metadata preservation
-- **Advanced export capabilities**: Export todos as GitHub issues with sub-task linking and label management
-- **Authentication handling**: Secure token management with permission validation and testing
-- **Git workflow automation**: Automated commits, pushes, and branch management for issue-based development
-
-### 🖼️ Image Support
-- Include images in chat prompts using file paths
-- Enhanced AI model routing for image-based tasks
-
-### 📄 Markdown Task Parser
-- Extract tasks from markdown files using various formats
-- Support for standard checkbox formats (- [ ], * [ ], + [ ])
-- TODO: format recognition
-- Automatic todo creation from parsed tasks
-
-### 🔌 MCP Server Integration
-- **Intelligent server recommendations**: Analyzes your codebase and automatically recommends relevant MCP servers
-- **Technology-aware selection**: Suggests servers based on detected tech stack (Python, JavaScript, Docker, Git, etc.)
-- **Essential server management**: Always includes Context7 (Upstash) and filesystem servers for core functionality
-- **Interactive configuration**: Guided setup and management through `2do mcp` command with validation
-- **Comprehensive server catalog**: Support for 15+ popular MCP servers including Git, GitHub, databases, cloud providers
-- **Persistent configuration**: Saves and manages MCP server configurations across sessions
-- **Advanced integration**: Seamless communication with MCP servers for enhanced AI model capabilities
 
 ## Technical Documentation
 
@@ -336,135 +417,6 @@ The project includes a comprehensive test suite with 11 test modules covering:
 - **Batch Operations**: Efficient handling of multiple todos simultaneously
 - **Cross-platform**: Consistent performance across Windows, macOS, and Linux
 
-## Installation
-
-### 🚀 Quick Install (Recommended)
-
-Install 2DO with a single command using our comprehensive curl-based installation system:
-
-#### Unix/Linux/macOS:
-```bash
-curl -fsSL https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.sh | bash
-```
-
-#### Windows (PowerShell):
-```powershell
-iwr -useb https://raw.githubusercontent.com/STAFE-GROUP-AB/2do-developer/main/install.ps1 | iex
-```
-
-### 🔧 What the Installer Does
-
-Our smart installation system provides a comprehensive, automated setup process:
-
-#### **Automatic Detection & Validation**
-- ✅ **Operating System Detection**: Automatically identifies your platform (Windows, macOS, Linux distributions)
-- ✅ **Architecture Detection**: Supports x86_64, ARM64, and other architectures
-- ✅ **Python Version Validation**: Ensures Python 3.8+ is available (provides installation guidance if missing)
-- ✅ **Distribution-Specific Support**: Uses appropriate package managers (apt, dnf/yum, pacman, Homebrew, winget, Chocolatey)
-
-#### **Smart Installation Process**
-- ✅ **Isolated Environment**: Creates a dedicated virtual environment at `~/.2do` for clean installation
-- ✅ **Multiple Download Methods**: Uses git clone with fallbacks to curl and wget for maximum compatibility
-- ✅ **Dependency Management**: Automatically installs all required Python packages with retry logic
-- ✅ **PATH Configuration**: Automatically adds `2do` command to your shell PATH (bash, zsh, PowerShell)
-- ✅ **Setup Wizard Integration**: Runs the interactive setup wizard for API key configuration
-
-#### **Robust Error Handling**
-- ✅ **Network Resilience**: Automatic retries for network timeouts and connectivity issues
-- ✅ **Fallback Methods**: Multiple download strategies if primary method fails
-- ✅ **Clear Error Messages**: Helpful troubleshooting guidance for common installation issues
-- ✅ **Recovery Options**: Provides manual installation instructions if automated setup fails
-- ✅ **Permission Handling**: Intelligent handling of file permissions and directory creation
-
-### 📦 Manual Installation
-
-If the automated installer doesn't work for your system, you can install manually:
-
-#### Method 1: Git Clone (Recommended for Development)
-```bash
-# Clone the repository
-git clone https://github.com/STAFE-GROUP-AB/2do-developer.git
-cd 2do-developer
-
-# Create virtual environment (recommended)
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies and package
-pip install -r requirements.txt
-pip install -e .
-
-# Verify installation
-2do --help
-```
-
-#### Method 2: Direct pip Install from GitHub
-```bash
-# Install directly from GitHub (latest main branch)
-pip install git+https://github.com/STAFE-GROUP-AB/2do-developer.git
-
-# Or install in user directory
-pip install --user git+https://github.com/STAFE-GROUP-AB/2do-developer.git
-```
-
-#### Method 3: Download and Install Manually
-```bash
-# Download the source code
-curl -L https://github.com/STAFE-GROUP-AB/2do-developer/archive/main.zip -o 2do-main.zip
-unzip 2do-main.zip
-cd 2do-developer-main
-
-# Install
-pip install -e .
-```
-
-### ✅ Installation Verification
-
-After installation, verify everything is working correctly:
-
-```bash
-# Check if 2do command is available
-2do --version
-
-# Verify Python environment
-python --version  # Should be 3.8+
-
-# Run setup wizard
-2do setup
-
-# Test basic functionality
-2do --help
-```
-
-#### Common Verification Issues
-- **Command not found**: Check if installation path is in your PATH
-- **Module import errors**: Verify all dependencies are installed
-- **Permission errors**: Ensure proper file permissions for config directory
-
-### 🌍 Cross-Platform Installation Support
-
-Our installation system is designed to work seamlessly across different platforms:
-
-#### **Supported Platforms**
-- **Linux**: Ubuntu, Debian, CentOS, RHEL, Fedora, Arch Linux, and other distributions
-- **macOS**: Intel and Apple Silicon (M1/M2) Macs with Homebrew support
-- **Windows**: Windows 10+ with PowerShell, including winget and Chocolatey integration
-
-#### **Package Manager Integration**
-The installer automatically detects and uses your system's package manager:
-- **Linux**: `apt` (Ubuntu/Debian), `dnf`/`yum` (RHEL/CentOS/Fedora), `pacman` (Arch)
-- **macOS**: `brew` (Homebrew)
-- **Windows**: `winget` (Windows Package Manager), `choco` (Chocolatey)
-
-#### **Installation Method Reliability** 
-The curl-based installation has been thoroughly tested and includes:
-- ✅ **Pipe Execution Support**: The `curl | bash` method works reliably across all platforms
-- ✅ **Shell Compatibility**: Works with bash, zsh, fish, and other POSIX-compliant shells
-- ✅ **Network Resilience**: Handles network interruptions and SSL certificate issues
-- ✅ **Fallback Mechanisms**: Multiple download methods if primary approach fails
-
-> **Note**: The installation scripts have been specifically optimized to work with pipe execution (`curl | bash` and `iwr | iex`), ensuring the documented installation commands work reliably on all supported platforms.
-
 ## Updates
 
 
@@ -517,57 +469,6 @@ cd /path/to/2do-developer
 git pull origin main
 pip install -e .
 ```
-
-## Quick Start
-
-### 1. Initial Setup
-```bash
-# Configure your AI model API keys and GitHub integration
-2do setup
-```
-
-This will guide you through configuring:
-- **OpenAI API key** for GPT models
-- **Anthropic API key** for Claude models  
-- **GitHub Personal Access Token** for repository integration
-
-### 2. Start Interactive Session
-```bash
-# Start in a git repository (automatically creates local 2DO folder)
-cd /path/to/your/git/project
-2do start
-
-# Start with a specific repository
-2do start --repo /path/to/your/project
-
-# Start without a repository (uses global configuration)
-2do start
-```
-
-### 3. Available Commands
-
-#### Interactive Session Features
-- **add-todo**: Create new todo items with different types and priorities
-- **list-todos**: View all todos in a formatted table
-- **start-multitask**: Process all pending todos in parallel
-- **start-browser**: Start browser integration mode with auto-detection
-- **refresh-browser**: Manually refresh the browser (when browser mode is active)
-- **stop-browser**: Stop browser integration and development server
-- **🆕 create-subtasks**: Break down large todos into manageable sub-tasks
-- **parse-markdown**: Extract tasks from markdown files and convert to todos
-- **github-issues**: Work with GitHub issues (list, work on, create todos from issues)
-- **create-github-issue**: Create new GitHub issues directly
-- **export-todos-to-github**: Export your todos as GitHub issues (with sub-task linking)
-- **chat**: Interactive chat with intelligent AI model routing (supports images)
-- **quit**: Exit the session
-
-#### Command Line Features
-- **2do setup**: Configure AI model API keys and GitHub integration
-- **2do start**: Start the interactive session
-- **2do verify**: Verify setup and guide through missing components
-- **2do mcp**: Manage MCP (Model Context Protocol) servers
-- **🆕 2do update**: Check for and install updates automatically
-- **2do --help**: Show help and available commands
 
 ## Usage Examples
 
