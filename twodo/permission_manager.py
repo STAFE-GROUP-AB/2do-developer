@@ -160,12 +160,12 @@ class SessionPermissionManager:
                     best_session = self._find_best_session_for_current_directory()
                     if best_session:
                         self.current_session = best_session
-                        console.print(f"🔄 Loaded {len(self.sessions)} sessions, current: {best_session.session_id}")
+                        # Silent session loading in normal operation
                     else:
                         # Fallback to most recently used session
                         most_recent = max(self.sessions.values(), key=lambda s: s.last_used)
                         self.current_session = most_recent
-                        console.print(f"🔄 Loaded {len(self.sessions)} sessions, current: {most_recent.session_id}")
+                        # Silent session loading in normal operation
                     
         except Exception as e:
             console.print(f"⚠️ Could not load permission sessions: {e}")
@@ -268,7 +268,9 @@ class SessionPermissionManager:
         
         # Smart auto-approval for files within project scope
         if self._should_auto_approve(path_obj, operation):
-            console.print(f"🔓 Auto-approving {operation} access to {path_str} (within project scope)")
+            if not hasattr(self, '_auto_approve_shown'):
+                console.print(f"🔓 Auto-approving {operation} access (within project scope)")
+                self._auto_approve_shown = True
             perm_operations = {operation: True}
             self.current_session.add_path_permission(path_str, **perm_operations)
             self._save_sessions()
