@@ -69,6 +69,16 @@ class PermissionSet:
             elif operation == 'execute' and path_str in self.execute_permissions:
                 return True
         
+        # Check if file is within any permitted directory
+        for allowed_path in self.allowed_paths:
+            if self._is_path_within_directory(path_str, allowed_path):
+                if operation == 'read' and allowed_path in self.read_permissions:
+                    return True
+                elif operation == 'write' and allowed_path in self.write_permissions:
+                    return True
+                elif operation == 'execute' and allowed_path in self.execute_permissions:
+                    return True
+        
         # Check pattern permissions
         for pattern in self.allowed_patterns:
             if self._matches_pattern(path_str, pattern):
@@ -80,6 +90,17 @@ class PermissionSet:
                     return True
         
         return False
+    
+    def _is_path_within_directory(self, file_path: str, directory_path: str) -> bool:
+        """Check if file_path is within directory_path"""
+        try:
+            file_path_obj = Path(file_path).resolve()
+            directory_path_obj = Path(directory_path).resolve()
+            
+            # Check if the file is within the directory
+            return str(file_path_obj).startswith(str(directory_path_obj) + os.sep) or str(file_path_obj) == str(directory_path_obj)
+        except Exception:
+            return False
     
     def _matches_pattern(self, path: str, pattern: str) -> bool:
         """Simple pattern matching for file paths"""
@@ -134,14 +155,47 @@ class SessionPermissionManager:
                     perm_set = PermissionSet.from_dict(session_data)
                     self.sessions[perm_set.session_id] = perm_set
                 
-                # Set most recently used session as current
+                # Set most appropriate session as current
                 if self.sessions:
-                    most_recent = max(self.sessions.values(), key=lambda s: s.last_used)
-                    self.current_session = most_recent
-                    console.print(f"🔄 Loaded {len(self.sessions)} sessions, current: {most_recent.session_id}")
+                    best_session = self._find_best_session_for_current_directory()
+                    if best_session:
+                        self.current_session = best_session
+                        # Silent session loading in normal operation
+                    else:
+                        # Fallback to most recently used session
+                        most_recent = max(self.sessions.values(), key=lambda s: s.last_used)
+                        self.current_session = most_recent
+                        # Silent session loading in normal operation
                     
         except Exception as e:
             console.print(f"⚠️ Could not load permission sessions: {e}")
+    
+    def _find_best_session_for_current_directory(self) -> Optional[PermissionSet]:
+        """Find the best session that covers the current working directory"""
+        try:
+            current_dir = str(Path.cwd().resolve())
+            
+            # Look for exact match first
+            for session in self.sessions.values():
+                if current_dir in session.allowed_paths:
+                    return session
+            
+            # Look for parent directory matches
+            for session in self.sessions.values():
+                for allowed_path in session.allowed_paths:
+                    if session._is_path_within_directory(current_dir, allowed_path):
+                        return session
+            
+            # Look for pattern matches
+            for session in self.sessions.values():
+                for pattern in session.allowed_patterns:
+                    if session._matches_pattern(current_dir, pattern):
+                        return session
+            
+        except Exception:
+            pass
+        
+        return None
     
     def _save_sessions(self):
         """Save permission sessions to disk"""
@@ -212,11 +266,29 @@ class SessionPermissionManager:
         if self.current_session.has_permission(path_str, operation):
             return True
         
+        # Smart auto-approval for files within project scope
+        if self._should_auto_approve(path_obj, operation):
+            if not hasattr(self, '_auto_approve_shown'):
+                console.print(f"🔓 Auto-approving {operation} access (within project scope)")
+                self._auto_approve_shown = True
+            perm_operations = {operation: True}
+            self.current_session.add_path_permission(path_str, **perm_operations)
+            self._save_sessions()
+            return True
+        
         # Interactive permission request (unless auto-approved)
         if not auto_approve:
             try:
                 if not self._can_interact_with_user():
-                    # If we can't interact, default to deny for security
+                    # If we can't interact, check if it's a safe operation within project scope
+                    if self._is_safe_project_operation(path_obj, operation):
+                        console.print(f"🔓 Auto-approving safe {operation} operation: {path_str}")
+                        perm_operations = {operation: True}
+                        self.current_session.add_path_permission(path_str, **perm_operations)
+                        self._save_sessions()
+                        return True
+                    
+                    # Otherwise deny for security
                     console.print(f"❌ Permission denied for {operation} access to {path_str}")
                     console.print("💡 Run in interactive mode to grant permissions")
                     return False
@@ -306,14 +378,88 @@ class SessionPermissionManager:
         console.print(f"✅ Project permissions granted for {project_path}")
         return True
     
+    def _should_auto_approve(self, path: Path, operation: str) -> bool:
+        """Check if we should auto-approve this operation based on existing permissions"""
+        if not self.current_session:
+            return False
+        
+        # Check if any parent directory already has permission for this operation
+        for allowed_path in self.current_session.allowed_paths:
+            if self.current_session._is_path_within_directory(str(path), allowed_path):
+                # Check if the parent directory has the required permission
+                if operation == 'read' and allowed_path in self.current_session.read_permissions:
+                    return True
+                elif operation == 'write' and allowed_path in self.current_session.write_permissions:
+                    return True
+                elif operation == 'execute' and allowed_path in self.current_session.execute_permissions:
+                    return True
+        
+        return False
+    
+    def _is_safe_project_operation(self, path: Path, operation: str) -> bool:
+        """Check if this is a safe operation within the current project scope"""
+        # Only auto-approve read operations for safety
+        if operation != 'read':
+            return False
+        
+        # Check if we're in a git repository and the file is within it
+        try:
+            current_dir = Path.cwd()
+            git_root = self._find_git_root(current_dir)
+            
+            if git_root:
+                # Use a simple path check instead of the _is_path_within_directory method
+                path_str = str(path.resolve())
+                git_root_str = str(git_root.resolve())
+                
+                if path_str.startswith(git_root_str + os.sep) or path_str == git_root_str:
+                    # Check if it's not a sensitive file
+                    if not self._is_sensitive_project_file(path):
+                        return True
+        except Exception:
+            pass
+        
+        return False
+    
+    def _find_git_root(self, start_path: Path) -> Optional[Path]:
+        """Find the git repository root from a starting path"""
+        current = start_path.resolve()
+        while current != current.parent:
+            if (current / '.git').exists():
+                return current
+            current = current.parent
+        return None
+    
+    def _is_sensitive_project_file(self, path: Path) -> bool:
+        """Check if a file is sensitive within the project (should not be auto-approved)"""
+        sensitive_patterns = [
+            '**/.env*',
+            '**/secrets.json',
+            '**/config/secrets.yaml',
+            '**/.ssh/**',
+            '**/private_key*',
+            '**/id_rsa*',
+            '**/password*',
+        ]
+        
+        path_str = str(path)
+        for pattern in sensitive_patterns:
+            if self.current_session._matches_pattern(path_str, pattern):
+                return True
+        
+        return False
+    
     def _can_interact_with_user(self) -> bool:
         """Check if we can interact with the user for permission requests"""
-        # Check if we have a controlling terminal
-        if os.isatty(1) and os.isatty(2):
+        # Enhanced check for multitasking scenarios
+        if os.isatty(0) and os.isatty(1) and os.isatty(2):
             # Check if we're NOT in a CI environment
             if not any(env in os.environ for env in ['CI', 'GITHUB_ACTIONS', 'JENKINS_URL']):
-                # Try to access controlling terminal
-                return os.path.exists('/dev/tty')
+                # Additional check for controlling terminal
+                try:
+                    return os.path.exists('/dev/tty')
+                except:
+                    pass
         return False
     
     def _is_sensitive_path(self, path: Path) -> bool:
