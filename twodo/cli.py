@@ -436,7 +436,7 @@ def _start_interactive_session(repo, force_analyze):
                 console.print("👍 Got it! I'll add this to your list and you can tackle it later when you're ready.")
                 # Continue with adding to list but don't execute
                 if action == "add-todo":
-                    handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params, execute_immediately=False)
+                    handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params, execute_immediately=False, multitasker=multitasker)
                 continue
         
         if action == "quit":
@@ -450,7 +450,7 @@ def _start_interactive_session(repo, force_analyze):
             smart_todo_handled = asyncio.run(automation_engine.handle_smart_todo_creation(user_input))
             if not smart_todo_handled:
                 # Fallback to traditional todo creation
-                handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params)
+                handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params, multitasker=multitasker)
         elif action == "list-todos":
             handle_list_todos(todo_manager)
         elif action == "remove-todo":
@@ -1484,7 +1484,7 @@ def show_natural_language_help():
     console.print("\n🤖 Remember: I'm here to help make your development workflow faster and more enjoyable!")
     console.print("=" * 50)
 
-def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, extracted_params, execute_immediately=True):
+def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, extracted_params, execute_immediately=True, multitasker=None):
     """Handle adding a todo from natural language input with human colleague interaction"""
     # Use extracted title if available, otherwise prompt
     if extracted_params and "suggested_title" in extracted_params:
@@ -1572,8 +1572,36 @@ def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, 
                 if execute_immediately:
                     if Confirm.ask("🚀 Want me to start working on these sub-tasks right now?"):
                         console.print("🔥 Awesome! Let me get started on these right away.")
-                        # TODO: Implement immediate execution logic for sub-tasks
+                        if multitasker:
+                            # Get the subtasks and process them
+                            sub_tasks = todo_manager.get_sub_tasks(todo_id)
+                            if sub_tasks:
+                                try:
+                                    asyncio.run(multitasker.start_multitask(sub_tasks))
+                                except Exception as e:
+                                    console.print(f"❌ Error processing sub-tasks: {e}")
+                                    console.print("💡 You can run them manually with 'multitask' command")
+                        else:
+                            console.print("⚠️ Multitasker not available. You can run the sub-tasks manually with 'multitask' command")
                         return True
+                else:
+                    return False  # Don't execute immediately if subtasks created but execution not requested
+            else:
+                console.print("⚠️ Couldn't create sub-tasks, but I can still work on the original task if you want.")
+        else:
+            console.print("👍 No problem! I'll keep it as one large task.")
+    
+    # Handle immediate execution for non-subtask cases or when subtasks weren't created
+    if execute_immediately:
+        if multitasker and todo:
+            if Confirm.ask("🚀 Ready to start working on this task right now?"):
+                console.print("🔥 Let me get started on this right away.")
+                try:
+                    asyncio.run(multitasker.start_multitask([todo]))
+                except Exception as e:
+                    console.print(f"❌ Error processing task: {e}")
+                    console.print("💡 You can run it manually with 'multitask' command")
+                return True
     
     return execute_immediately
 

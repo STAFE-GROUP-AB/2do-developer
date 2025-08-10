@@ -760,13 +760,46 @@ jobs:
             return False
     
     async def _start_single_todo_multitask(self, todo_id: str):
-        """Start multitasking on a single specific todo"""
+        """Start multitasking on a single specific todo with auto-subtask creation for large tasks"""
         # Get the specific todo by ID
         todo = self.todo_manager.get_todo_by_id(todo_id)
-        if todo:
-            await self.multitasker.start_multitask([todo])
-        else:
+        if not todo:
             console.print(f"❌ Todo with ID {todo_id} not found")
+            return
+        
+        # Check if the todo is too large and should be broken down into subtasks
+        if self.todo_manager.is_todo_too_large(todo):
+            # Check if it already has subtasks
+            if not todo.get("sub_task_ids") or len(todo["sub_task_ids"]) == 0:
+                console.print("🔍 This task is quite large and complex.")
+                if Confirm.ask("🎯 Would you like me to break it down into smaller, more manageable sub-tasks first?"):
+                    console.print("🔧 Creating sub-tasks to make this more manageable...")
+                    sub_task_ids = self.todo_manager.create_sub_tasks_from_todo(todo_id, self.ai_router)
+                    
+                    if sub_task_ids:
+                        console.print(f"✅ Created {len(sub_task_ids)} sub-tasks!")
+                        
+                        # Get the subtasks to process
+                        sub_tasks = self.todo_manager.get_sub_tasks(todo_id)
+                        if sub_tasks:
+                            console.print("🚀 Now I'll work on these sub-tasks instead of the large task...")
+                            await self.multitasker.start_multitask(sub_tasks)
+                            return
+                    else:
+                        console.print("⚠️ Couldn't create sub-tasks, proceeding with the original task...")
+                else:
+                    console.print("👍 Proceeding with the original large task...")
+            else:
+                # Already has subtasks, process them instead
+                sub_tasks = self.todo_manager.get_sub_tasks(todo_id)
+                if sub_tasks and any(sub['status'] == 'pending' for sub in sub_tasks):
+                    console.print(f"📋 This task already has {len(sub_tasks)} sub-tasks. Working on them...")
+                    pending_subtasks = [sub for sub in sub_tasks if sub['status'] == 'pending']
+                    await self.multitasker.start_multitask(pending_subtasks)
+                    return
+        
+        # Process the original todo (either it's not too large, or user declined subtask creation)
+        await self.multitasker.start_multitask([todo])
     
     def toggle_github_pro_mode(self) -> bool:
         """Toggle GitHub Pro mode on/off"""
