@@ -187,7 +187,7 @@ def _show_manual_setup_instructions(config_manager):
     ))
 
 @click.group()
-@click.version_option(package_name="2do")
+@click.version_option(version="0.1.0", package_name=None)
 def cli():
     """2DO - Intelligent AI model routing and multitasking CLI tool"""
     pass
@@ -678,6 +678,212 @@ def add_ai(provider, model, api_key, list_supported):
         _direct_add_ai(config_manager, provider, model, api_key)
 
 
+@cli.command("local-models")
+@click.option('--enable', is_flag=True, help='Enable local model support')
+@click.option('--disable', is_flag=True, help='Disable local model support')
+@click.option('--list', 'list_models', is_flag=True, help='List available local models')
+@click.option('--status', is_flag=True, help='Show local model status')
+def local_models(enable, disable, list_models, status):
+    """Manage local AI models for privacy and offline use"""
+    console.print(Panel.fit("🏠 Local AI Models", style="bold green"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        ai_router = AIRouter(config_manager)
+        
+        if enable:
+            ai_router.enable_local_models()
+            return
+        
+        if disable:
+            ai_router.disable_local_models()
+            return
+        
+        if list_models:
+            local_models = ai_router._initialize_local_models()
+            if not local_models:
+                console.print("💭 No local models configured")
+                console.print("💡 Use '2do local-models --enable' to enable local model support")
+                return
+            
+            table = Table(title="🏠 Available Local Models")
+            table.add_column("Model", style="cyan")
+            table.add_column("Status", style="green")
+            table.add_column("Strengths", style="yellow")
+            table.add_column("Memory", style="blue")
+            table.add_column("Path", style="dim")
+            
+            for name, model in local_models.items():
+                is_available = ai_router._is_local_model_available(model)
+                status = "✅ Available" if is_available else "❌ Not Downloaded"
+                strengths = ", ".join(model.strengths[:3])
+                memory = f"{model.memory_requirements_gb}GB"
+                path = str(Path(model.model_path).expanduser())
+                
+                table.add_row(name, status, strengths, memory, path)
+            
+            console.print(table)
+            return
+        
+        if status or not any([enable, disable, list_models]):
+            # Show status by default
+            enabled = config_manager.get_preference("enable_local_models", False)
+            console.print(f"📊 Local Model Status:")
+            console.print(f"  • Enabled: {'✅ Yes' if enabled else '❌ No'}")
+            
+            if enabled:
+                local_models = ai_router._initialize_local_models()
+                available_count = sum(1 for model in local_models.values() 
+                                    if ai_router._is_local_model_available(model))
+                console.print(f"  • Available models: {available_count}/{len(local_models)}")
+                console.print(f"  • Models directory: ~/.2do/models/")
+                
+                if available_count == 0:
+                    console.print("\n💡 To use local models:")
+                    console.print("  1. Download model files to ~/.2do/models/")
+                    console.print("  2. Ensure you have sufficient RAM")
+                    console.print("  3. Use '2do local-models --list' to see which models are expected")
+            else:
+                console.print("\n💡 Enable local models for:")
+                console.print("  • Complete privacy (no data sent to external APIs)")
+                console.print("  • Offline operation")
+                console.print("  • Zero cost per request")
+                console.print("  • Use '2do local-models --enable' to get started")
+        
+    except Exception as e:
+        console.print(f"❌ Error managing local models: {e}")
+
+
+@cli.command("streaming")
+@click.option('--enable', is_flag=True, help='Enable streaming responses')
+@click.option('--disable', is_flag=True, help='Disable streaming responses')
+@click.option('--status', is_flag=True, help='Show streaming status')
+def streaming(enable, disable, status):
+    """Manage AI response streaming for real-time output"""
+    console.print(Panel.fit("⚡ Streaming Responses", style="bold blue"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        
+        if enable:
+            config_manager.set_preference("enable_streaming", True)
+            console.print("✅ Streaming responses enabled!")
+            console.print("💡 You'll now see AI responses appear in real-time")
+            return
+        
+        if disable:
+            config_manager.set_preference("enable_streaming", False)
+            console.print("❌ Streaming responses disabled")
+            console.print("💡 AI responses will now appear all at once when complete")
+            return
+        
+        # Show status by default
+        enabled = config_manager.get_preference("enable_streaming", True)
+        console.print(f"📊 Streaming Status:")
+        console.print(f"  • Enabled: {'✅ Yes' if enabled else '❌ No'}")
+        
+        if enabled:
+            console.print("\n⚡ Benefits of streaming:")
+            console.print("  • See responses as they're generated")
+            console.print("  • Better user experience for long responses")  
+            console.print("  • Ability to interrupt with Escape key")
+        else:
+            console.print("\n📦 Non-streaming mode:")
+            console.print("  • Responses appear all at once")
+            console.print("  • May support more advanced features (tools, etc.)")
+            console.print("  • Better for automated processing")
+        
+    except Exception as e:
+        console.print(f"❌ Error managing streaming: {e}")
+
+
+@cli.command("config")
+@click.argument('action', type=click.Choice(['get', 'set', 'list', 'reset']))
+@click.argument('key', required=False)
+@click.argument('value', required=False)
+def config_command(action, key, value):
+    """Manage 2DO configuration settings"""
+    console.print(Panel.fit("⚙️ Configuration Management", style="bold cyan"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        
+        if action == 'list':
+            preferences = config_manager.config.get('preferences', {})
+            if not preferences:
+                console.print("📝 No configuration preferences set")
+                return
+            
+            table = Table(title="⚙️ Configuration Settings")
+            table.add_column("Setting", style="cyan")
+            table.add_column("Value", style="yellow")
+            table.add_column("Description", style="dim")
+            
+            descriptions = {
+                'enable_streaming': 'Real-time AI response streaming',
+                'enable_local_models': 'Local AI model support',
+                'show_all_local_models': 'Show local models even if not downloaded',
+                'load_only_free_models': 'Only load free AI models by default',
+                'default_model': 'Preferred AI model for routing',
+                'max_parallel_tasks': 'Maximum concurrent tasks in multitasking',
+                'memory_enabled': 'Enable session memory across runs'
+            }
+            
+            for setting, value in preferences.items():
+                description = descriptions.get(setting, 'User-defined setting')
+                table.add_row(setting, str(value), description)
+            
+            console.print(table)
+            
+        elif action == 'get':
+            if not key:
+                console.print("❌ Please specify a setting key to get")
+                return
+            
+            value = config_manager.get_preference(key)
+            if value is not None:
+                console.print(f"⚙️ {key}: {value}")
+            else:
+                console.print(f"❌ Setting '{key}' not found")
+        
+        elif action == 'set':
+            if not key or value is None:
+                console.print("❌ Please specify both key and value")
+                return
+            
+            # Convert string values to appropriate types
+            if value.lower() in ['true', 'false']:
+                value = value.lower() == 'true'
+            elif value.isdigit():
+                value = int(value)
+            elif value.replace('.', '').isdigit():
+                value = float(value)
+            
+            config_manager.set_preference(key, value)
+            console.print(f"✅ Set {key} = {value}")
+        
+        elif action == 'reset':
+            if key:
+                # Reset specific setting
+                if config_manager.config.get('preferences', {}).pop(key, None) is not None:
+                    config_manager._save_config()
+                    console.print(f"✅ Reset setting: {key}")
+                else:
+                    console.print(f"❌ Setting '{key}' not found")
+            else:
+                # Reset all preferences
+                if Confirm.ask("Reset ALL configuration preferences?", default=False):
+                    config_manager.config['preferences'] = {}
+                    config_manager._save_config()
+                    console.print("✅ All preferences reset to defaults")
+        
+    except Exception as e:
+        console.print(f"❌ Error managing configuration: {e}")
+
+
 @cli.command("ai-list")
 @click.option('--show-free', is_flag=True, help='Show only free models')
 @click.option('--show-configured', is_flag=True, help='Show only configured models')
@@ -1001,6 +1207,9 @@ def handle_chat(ai_router, image_handler):
         
         # Route to best AI model with escape handling
         try:
+            # Check if streaming is enabled
+            use_streaming = config_manager.get_preference("enable_streaming", True) if 'config_manager' in locals() else True
+            
             with escape_listener() as escape_handler:
                 if image_path:
                     # Legacy format support
@@ -1008,14 +1217,30 @@ def handle_chat(ai_router, image_handler):
                         response = ai_router.route_and_process_with_image(prompt, image_path)
                     else:
                         response = asyncio.run(ai_router.route_and_process(f"{prompt}\n\n[Image: {image_path}]"))
+                    console.print(f"\n🤖 AI: {response}\n")
                 else:
-                    response = asyncio.run(ai_router.route_and_process(prompt_with_image))
+                    if use_streaming:
+                        # Use streaming response
+                        console.print("\n🤖 AI: ", end="")
+                        async def stream_response():
+                            full_response = ""
+                            async for chunk in ai_router.route_and_process_stream(prompt_with_image):
+                                if escape_handler.is_interrupted():
+                                    break
+                                console.print(chunk, end="", flush=True)
+                                full_response += chunk
+                            return full_response
+                        
+                        response = asyncio.run(stream_response())
+                        console.print("\n")  # New line after streaming
+                    else:
+                        # Use non-streaming response (original behavior)
+                        response = asyncio.run(ai_router.route_and_process(prompt_with_image))
+                        console.print(f"\n🤖 AI: {response}\n")
                 
                 if escape_handler.is_interrupted():
                     console.print("\n⚠️ AI response interrupted by user")
                     continue
-                    
-            console.print(f"\n🤖 AI: {response}\n")
             
         except EscapeInterrupt:
             console.print("\n⚠️ AI response interrupted by escape key")
@@ -1708,8 +1933,23 @@ If this is a technical question, provide clear explanations with code examples w
         enhanced_prompt += f"\n\n[Image attached: {clipboard_image_path}]"
     
     # Route to best AI model with developer context
-    response = asyncio.run(ai_router.route_and_process(enhanced_prompt))
-    console.print(f"\n🤖 {response}\n")
+    # Check if streaming is enabled (default to True for better UX)
+    use_streaming = True  # Could be made configurable later
+    
+    if use_streaming:
+        console.print("🤖 ", end="")
+        async def stream_chat_response():
+            full_response = ""
+            async for chunk in ai_router.route_and_process_stream(enhanced_prompt):
+                console.print(chunk, end="", flush=True)
+                full_response += chunk
+            return full_response
+        
+        response = asyncio.run(stream_chat_response())
+        console.print("\n")  # New line after streaming
+    else:
+        response = asyncio.run(ai_router.route_and_process(enhanced_prompt))
+        console.print(f"\n🤖 {response}\n")
     
     # Offer follow-up suggestions
     console.print("💡 Want to do something with this information? Try:")

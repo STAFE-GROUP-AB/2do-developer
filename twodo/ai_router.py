@@ -96,6 +96,20 @@ class ModelCapability:
     is_free: bool = False  # Whether this model is free to use
     requires_api_key: bool = True  # Whether this model requires an API key
 
+@dataclass
+class LocalModelCapability(ModelCapability):
+    """Represents capabilities of a local AI model"""
+    model_path: str = ""
+    quantization: str = "4bit"  # Quantization level for local models
+    memory_requirements_gb: int = 4  # Memory requirements in GB
+    gpu_required: bool = False  # Whether GPU is required
+    
+    def __post_init__(self):
+        # Local models are always free and don't require API keys
+        self.is_free = True
+        self.requires_api_key = False
+        self.cost_per_token = 0.0
+
 class AIRouter:
     """Routes prompts to the most suitable AI model"""
     
@@ -387,6 +401,70 @@ class AIRouter:
             for name, model in perplexity_models.items():
                 if not load_only_free or model.is_free:
                     models[name] = model
+        
+        # Local models - Always available and free
+        local_models = self._initialize_local_models()
+        for name, model in local_models.items():
+            if not load_only_free or model.is_free:
+                models[name] = model
+        
+        return models
+    
+    def _initialize_local_models(self) -> Dict[str, LocalModelCapability]:
+        """Initialize available local models"""
+        local_models = {}
+        
+        # Check if local model support is enabled
+        if not self.config.get_preference("enable_local_models", False):
+            return local_models
+        
+        # Define available local models - these would typically be downloaded/configured separately
+        model_definitions = {
+            "llama-3.2-3b": LocalModelCapability(
+                name="llama-3.2-3b",
+                provider="local",
+                strengths=["general", "code", "reasoning", "privacy"],
+                context_length=8192,
+                cost_per_token=0.0,
+                speed_rating=6,
+                model_path="~/.2do/models/llama-3.2-3b",
+                quantization="4bit",
+                memory_requirements_gb=3,
+                gpu_required=False
+            ),
+            "codellama-7b": LocalModelCapability(
+                name="codellama-7b", 
+                provider="local",
+                strengths=["code", "programming", "debugging", "privacy"],
+                context_length=4096,
+                cost_per_token=0.0,
+                speed_rating=5,
+                model_path="~/.2do/models/codellama-7b",
+                quantization="4bit",
+                memory_requirements_gb=5,
+                gpu_required=False
+            ),
+            "starcoder2-3b": LocalModelCapability(
+                name="starcoder2-3b",
+                provider="local", 
+                strengths=["code", "completion", "refactoring", "privacy"],
+                context_length=16384,
+                cost_per_token=0.0,
+                speed_rating=7,
+                model_path="~/.2do/models/starcoder2-3b",
+                quantization="4bit",
+                memory_requirements_gb=3,
+                gpu_required=False
+            )
+        }
+        
+        # Only include models that are actually available (have model files)
+        for name, model in model_definitions.items():
+            model_path = Path(model.model_path).expanduser()
+            if model_path.exists() or self.config.get_preference("show_all_local_models", False):
+                local_models[name] = model
+        
+        return local_models
     
     def enable_all_models(self):
         """Enable all available models (including paid ones)"""
@@ -1084,6 +1162,54 @@ REMEMBER: You have real file system access - USE IT!
             console.print(f"❌ All models failed. Last error: {str(e)}")
             self.last_selected_model = "failed"
             return f"Error: All AI models are currently unavailable. Please check your API keys and try again."
+
+    async def route_and_process_stream(self, prompt: str, todo_context: str = None):
+        """Route prompt to best model and process it with streaming responses"""
+        # Check for escape interrupt before processing
+        if check_escape_interrupt():
+            raise EscapeInterrupt("AI processing interrupted by escape key")
+        
+        # Check for interactive requirements before processing
+        enhanced_prompt = await self._handle_interactive_requirements(prompt)
+        
+        # Enhance prompt with developer context if available
+        if self.developer_context and not enhanced_prompt.startswith("Based on this request:"):
+            enhanced_prompt = f"{self.developer_context}\n\nUser request: {enhanced_prompt}"
+        
+        # Check for escape interrupt before model selection
+        if check_escape_interrupt():
+            raise EscapeInterrupt("AI processing interrupted by escape key")
+        
+        # Try the best model first
+        try:
+            model_name = self.select_best_model(enhanced_prompt, todo_context)
+            self.last_selected_model = model_name
+            async for chunk in self._process_with_model_stream(model_name, enhanced_prompt):
+                yield chunk
+        except Exception as e:
+            console.print(f"❌ Primary model failed: {str(e)}")
+            
+            # Try fallback models
+            fallback_models = [name for name in self.models.keys() if name != model_name]
+            for fallback_model in fallback_models:
+                # Check for escape interrupt before trying fallback
+                if check_escape_interrupt():
+                    raise EscapeInterrupt("AI processing interrupted by escape key")
+                    
+                try:
+                    console.print(f"🔄 Trying fallback model: {fallback_model}")
+                    self.last_selected_model = fallback_model
+                    async for chunk in self._process_with_model_stream(fallback_model, enhanced_prompt):
+                        yield chunk
+                    return  # Success with fallback
+                except Exception as fallback_error:
+                    console.print(f"❌ Fallback model {fallback_model} failed: {str(fallback_error)}")
+                    continue
+            
+            # If all models fail, yield error
+            console.print(f"❌ All models failed. Last error: {str(e)}")
+            self.last_selected_model = "failed"
+            yield f"Error: All AI models are currently unavailable. Please check your API keys and try again."
     
     async def _process_with_model(self, model_name: str, prompt: str) -> str:
         """Process prompt with a specific model"""
@@ -1095,8 +1221,33 @@ REMEMBER: You have real file system access - USE IT!
             return await self._process_anthropic(model_name, prompt)
         elif model.provider == "google":
             return await self._process_google(model_name, prompt)
+        elif model.provider == "local":
+            return await self._process_local_model(model_name, prompt)
         elif model.provider in ["xai", "deepseek", "mistral", "cohere", "perplexity"]:
             return self._process_placeholder_provider(model.provider, model_name, prompt)
+        else:
+            raise ValueError(f"Unsupported provider: {model.provider}")
+    
+    async def _process_with_model_stream(self, model_name: str, prompt: str):
+        """Process prompt with a specific model using streaming responses"""
+        model = self.models[model_name]
+        
+        if model.provider == "openai":
+            async for chunk in self._process_openai_stream(model_name, prompt):
+                yield chunk
+        elif model.provider == "anthropic":
+            async for chunk in self._process_anthropic_stream(model_name, prompt):
+                yield chunk
+        elif model.provider == "google":
+            async for chunk in self._process_google_stream(model_name, prompt):
+                yield chunk
+        elif model.provider == "local":
+            async for chunk in self._process_local_model_stream(model_name, prompt):
+                yield chunk
+        elif model.provider in ["xai", "deepseek", "mistral", "cohere", "perplexity"]:
+            # For placeholder providers, yield the full response at once
+            response = self._process_placeholder_provider(model.provider, model_name, prompt)
+            yield response
         else:
             raise ValueError(f"Unsupported provider: {model.provider}")
     
@@ -1413,3 +1564,258 @@ The model '{model_name}' from {info['name']} is configured but the API integrati
                 raise ValueError(f"Rate limit or quota exceeded for Google AI API")
             else:
                 raise ValueError(f"Google AI API error: {error_msg}")
+
+    # STREAMING METHODS - New enhancement for real-time responses
+    
+    async def _process_openai_stream(self, model_name: str, prompt: str):
+        """Process prompt using OpenAI model with streaming responses"""
+        try:
+            # Check for escape interrupt before processing
+            if check_escape_interrupt():
+                raise EscapeInterrupt("OpenAI streaming interrupted by escape key")
+                
+            client = self.clients["openai"]
+            
+            # Enhance prompt with file operation instructions if filesystem is available
+            enhanced_prompt = prompt
+            if self.filesystem_initialized:
+                enhanced_prompt = self._add_file_operation_instructions(prompt)
+            
+            # Prepare messages
+            messages = [{"role": "user", "content": enhanced_prompt}]
+            
+            # Note: For streaming, we don't use tools as they require non-streaming mode
+            # This is a limitation that could be enhanced in the future
+            request_params = {
+                'model': model_name,
+                'messages': messages,
+                'temperature': 0.7,
+                'max_tokens': 4000,
+                'stream': True
+            }
+            
+            # Check for escape interrupt before API call
+            if check_escape_interrupt():
+                raise EscapeInterrupt("OpenAI streaming interrupted by escape key")
+            
+            # Create streaming completion
+            stream = client.chat.completions.create(**request_params)
+            
+            for chunk in stream:
+                # Check for escape interrupt during streaming
+                if check_escape_interrupt():
+                    raise EscapeInterrupt("OpenAI streaming interrupted by escape key")
+                
+                if chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
+                    
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "model" in error_msg.lower() and "not found" in error_msg.lower():
+                raise ValueError(f"Model '{model_name}' not found or unavailable in OpenAI API")
+            elif "401" in error_msg or "authentication" in error_msg.lower():
+                raise ValueError(f"Invalid OpenAI API key")
+            elif "429" in error_msg or "rate_limit" in error_msg.lower():
+                raise ValueError(f"Rate limit exceeded for OpenAI API")
+            else:
+                raise ValueError(f"OpenAI API streaming error: {error_msg}")
+
+    async def _process_anthropic_stream(self, model_name: str, prompt: str):
+        """Process prompt using Anthropic model with streaming responses"""
+        try:
+            # Check for escape interrupt before processing
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Anthropic streaming interrupted by escape key")
+                
+            client = self.clients["anthropic"]
+            
+            # Enhance prompt with file operation instructions if filesystem is available
+            enhanced_prompt = prompt
+            if self.filesystem_initialized:
+                enhanced_prompt = self._add_file_operation_instructions(prompt)
+            
+            # Note: For streaming, we don't use tools as they require non-streaming mode
+            # This is a limitation that could be enhanced in the future
+            request_params = {
+                'model': model_name,
+                'max_tokens': 4000,
+                'messages': [{"role": "user", "content": enhanced_prompt}],
+                'stream': True
+            }
+            
+            # Check for escape interrupt before API call
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Anthropic streaming interrupted by escape key")
+            
+            # Create streaming completion
+            with client.messages.stream(**request_params) as stream:
+                for text in stream.text_stream:
+                    # Check for escape interrupt during streaming
+                    if check_escape_interrupt():
+                        raise EscapeInterrupt("Anthropic streaming interrupted by escape key")
+                    
+                    yield text
+                    
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "not_found_error" in error_msg:
+                raise ValueError(f"Model '{model_name}' not found or unavailable in Anthropic API")
+            elif "401" in error_msg or "authentication" in error_msg.lower():
+                raise ValueError(f"Invalid Anthropic API key")
+            elif "429" in error_msg or "rate_limit" in error_msg.lower():
+                raise ValueError(f"Rate limit exceeded for Anthropic API")
+            else:
+                raise ValueError(f"Anthropic API streaming error: {error_msg}")
+
+    async def _process_google_stream(self, model_name: str, prompt: str):
+        """Process prompt using Google Gemini model with streaming responses"""
+        if not GOOGLE_AI_AVAILABLE:
+            raise ValueError("Google Generative AI library not available. Please install google-generativeai.")
+        
+        try:
+            # Check for escape interrupt before processing
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Google streaming interrupted by escape key")
+                
+            client = self.clients["google"]
+            model = client.GenerativeModel(model_name)
+            
+            # Enhance prompt with file operation instructions if filesystem is available
+            enhanced_prompt = prompt
+            if self.filesystem_initialized:
+                enhanced_prompt = self._add_file_operation_instructions(prompt)
+        
+            # Check for escape interrupt before API call
+            if check_escape_interrupt():
+                raise EscapeInterrupt("Google streaming interrupted by escape key")
+            
+            # Create streaming response
+            response = model.generate_content(enhanced_prompt, stream=True)
+            
+            for chunk in response:
+                # Check for escape interrupt during streaming
+                if check_escape_interrupt():
+                    raise EscapeInterrupt("Google streaming interrupted by escape key")
+                
+                if chunk.text:
+                    yield chunk.text
+                    
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "not found" in error_msg.lower():
+                raise ValueError(f"Model '{model_name}' not found or unavailable in Google AI API")
+            elif "401" in error_msg or "authentication" in error_msg.lower():
+                raise ValueError(f"Invalid Google AI API key")
+            elif "429" in error_msg or "quota" in error_msg.lower():
+                raise ValueError(f"Rate limit or quota exceeded for Google AI API")
+            else:
+                raise ValueError(f"Google AI API streaming error: {error_msg}")
+
+    # LOCAL MODEL METHODS - New enhancement for privacy and cost benefits
+    
+    async def _process_local_model(self, model_name: str, prompt: str) -> str:
+        """Process prompt using a local model"""
+        model = self.models[model_name]
+        
+        if not isinstance(model, LocalModelCapability):
+            raise ValueError(f"Model {model_name} is not a local model")
+        
+        try:
+            # Check if model is available
+            if not self._is_local_model_available(model):
+                return await self._handle_local_model_unavailable(model)
+            
+            # For now, we simulate local model processing
+            # In a real implementation, this would use libraries like transformers, llama.cpp, etc.
+            return self._simulate_local_model_response(model, prompt)
+            
+        except Exception as e:
+            raise ValueError(f"Local model processing error: {str(e)}")
+
+    async def _process_local_model_stream(self, model_name: str, prompt: str):
+        """Process prompt using a local model with streaming responses"""
+        model = self.models[model_name]
+        
+        if not isinstance(model, LocalModelCapability):
+            raise ValueError(f"Model {model_name} is not a local model")
+        
+        try:
+            # Check if model is available
+            if not self._is_local_model_available(model):
+                error_msg = await self._handle_local_model_unavailable(model)
+                yield error_msg
+                return
+            
+            # For now, we simulate streaming local model processing
+            # In a real implementation, this would use libraries like transformers, llama.cpp, etc.
+            response = self._simulate_local_model_response(model, prompt)
+            
+            # Simulate streaming by yielding chunks
+            words = response.split()
+            for i, word in enumerate(words):
+                # Check for escape interrupt during streaming
+                if check_escape_interrupt():
+                    raise EscapeInterrupt("Local model streaming interrupted by escape key")
+                
+                if i == 0:
+                    yield word
+                else:
+                    yield f" {word}"
+                
+                # Small delay to simulate streaming
+                await asyncio.sleep(0.05)
+                
+        except Exception as e:
+            raise ValueError(f"Local model streaming error: {str(e)}")
+    
+    def _is_local_model_available(self, model: LocalModelCapability) -> bool:
+        """Check if a local model is available for use"""
+        model_path = Path(model.model_path).expanduser()
+        return model_path.exists()
+    
+    async def _handle_local_model_unavailable(self, model: LocalModelCapability) -> str:
+        """Handle when a local model is not available"""
+        return (f"Local model '{model.name}' is not available. "
+                f"Model should be located at: {model.model_path}\n\n"
+                f"To use local models:\n"
+                f"1. Enable local models: 2do config set enable_local_models true\n"
+                f"2. Download the model to the specified path\n"
+                f"3. For {model.name}, you would typically:\n"
+                f"   - Download from Hugging Face or other source\n"
+                f"   - Place model files in {model.model_path}\n"
+                f"   - Ensure you have {model.memory_requirements_gb}GB+ RAM available\n\n"
+                f"Note: This is a placeholder implementation. Real local model support "
+                f"would require additional dependencies like transformers, torch, or llama.cpp.")
+    
+    def _simulate_local_model_response(self, model: LocalModelCapability, prompt: str) -> str:
+        """Simulate local model response (placeholder implementation)"""
+        # This is a placeholder that simulates what a local model might return
+        # In a real implementation, this would load and run the actual model
+        
+        if "code" in model.strengths:
+            return (f"[Local Model {model.name}] I understand you're asking about code. "
+                   f"As a local model running on your machine, I can help with "
+                   f"programming tasks while keeping your data private. "
+                   f"However, this is currently a simulation - real local model "
+                   f"integration would require downloading the actual model files "
+                   f"and using libraries like transformers or llama.cpp.")
+        else:
+            return (f"[Local Model {model.name}] I'm a local AI model running on your machine. "
+                   f"I can help with various tasks while keeping your data completely private. "
+                   f"This is currently a simulation - to use real local models, you would need "
+                   f"to download the model files and configure the appropriate runtime libraries.")
+    
+    def enable_local_models(self):
+        """Enable local model support"""
+        self.config.set_preference("enable_local_models", True)
+        self.config.set_preference("show_all_local_models", True)
+        self.models = self._initialize_models()
+        console.print("✅ Local model support enabled!")
+        console.print("💡 Note: You'll need to download model files to actually use them.")
+        console.print("📁 Models will be stored in ~/.2do/models/")
+    
+    def disable_local_models(self):
+        """Disable local model support"""
+        self.config.set_preference("enable_local_models", False)
+        self.models = self._initialize_models()
+        console.print("❌ Local model support disabled.")
