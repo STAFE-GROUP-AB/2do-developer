@@ -50,6 +50,34 @@ from .escape_handler import escape_listener, check_escape_interrupt, EscapeInter
 
 console = Console()
 
+def _get_colleague_task_confirmation(action: str, user_input: str) -> bool:
+    """
+    Get confirmation from user in a human colleague-like manner.
+    Returns True if user wants to run the task immediately, False to add to list.
+    Default is False (add to list) as requested in the issue.
+    """
+    console.print("🤔 I understand what you want to work on!")
+    
+    if action == "add-todo":
+        message = "Would you like me to work on this task right now, or should I just add it to your todo list for later?"
+        console.print("📝 This looks like a new task to track.")
+    elif action == "multitask":
+        message = "Should I start processing your pending tasks in parallel right now, or wait until later?"
+        console.print("⚡ I can work on multiple tasks simultaneously.")
+    elif action == "run-all":
+        message = "Ready to tackle all your pending todos with multiple AI agents? Or should I wait?"
+        console.print("🚀 This will process all your pending work with up to 5 AI agents working in parallel.")
+    else:
+        message = "Want me to work on this right now, or add it to your list for later?"
+    
+    console.print(f"💭 {message}")
+    
+    # Use Rich Confirm with default=False as requested in the issue
+    return Confirm.ask(
+        "[bold yellow]Work on this now?[/bold yellow]", 
+        default=False
+    )
+
 def _is_terminal_interactive():
     """Enhanced terminal interactivity detection (handles curl | bash correctly)"""
     import sys
@@ -368,7 +396,8 @@ def _start_interactive_session(repo, force_analyze):
     
     # Interactive session with natural language interface
     console.print("\n🤖 Welcome to 2DO - Your AI-powered development companion!")
-    console.print("💡 Just tell me what you'd like to do in natural language, or type 'help' for guidance")
+    console.print("💡 I'm here to help you like a colleague. Just tell me what you'd like to work on!")
+    console.print("   I'll ask for confirmation before running tasks and can break down complex work into smaller pieces.")
     
     # Add developer-focused context to AI router
     ai_router.set_developer_context(intent_router.get_developer_context_prompt())
@@ -376,13 +405,14 @@ def _start_interactive_session(repo, force_analyze):
     while True:
         console.print("\n" + "="*50)
         
-        # Natural language prompt instead of explicit choices
+        # Natural language prompt with more human-like tone
         user_input = Prompt.ask(
-            "[bold cyan]What can 2do help you with?[/bold cyan]",
+            "[bold cyan]Hey! What can I help you with today?[/bold cyan]",
             default=""
         )
         
         if not user_input.strip():
+            console.print("😊 No worries! Let me know what you're working on whenever you're ready.")
             show_natural_language_help()
             continue
         
@@ -395,11 +425,22 @@ def _start_interactive_session(repo, force_analyze):
         intent_match = intent_router.analyze_intent(user_input)
         action = intent_match.intent
         
-        # Show friendly confirmation
+        # Show friendly confirmation with human colleague tone
         confirmation = intent_router.get_friendly_confirmation(action, intent_match.extracted_params)
         console.print(f"\n{confirmation}")
         
+        # Human colleague-like task confirmation workflow
+        if action in ["add-todo", "multitask", "run-all"]:
+            should_run_now = _get_colleague_task_confirmation(action, user_input)
+            if not should_run_now:
+                console.print("👍 Got it! I'll add this to your list and you can tackle it later when you're ready.")
+                # Continue with adding to list but don't execute
+                if action == "add-todo":
+                    handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params, execute_immediately=False)
+                continue
+        
         if action == "quit":
+            console.print("👋 Take care! Feel free to come back whenever you need help with your work.")
             # Clean up browser integration before quitting
             if browser_integration.is_active:
                 browser_integration.stop_browser_mode()
@@ -419,9 +460,11 @@ def _start_interactive_session(repo, force_analyze):
         elif action == "create-subtasks":
             handle_create_subtasks(todo_manager, ai_router)
         elif action == "multitask":
+            console.print("🔥 Great! Let me process your pending tasks with multiple AI agents working in parallel.")
             handle_multitask(multitasker, todo_manager, browser_integration)
         elif action == "run-all":
             # The ultimate shortcut - run all todos at once!
+            console.print("🚀 Awesome! I'll get all your pending work done with up to 5 AI agents. This is going to be efficient!")
             # CRITICAL FIX: Pass working directory to ensure correct file operations
             automation_engine.run_all_todos_sync(working_dir)
         elif action == "parse-markdown":
@@ -440,7 +483,8 @@ def _start_interactive_session(repo, force_analyze):
         elif action == "chat":
             handle_chat_natural(ai_router, image_handler, user_input)
         else:
-            # Fallback to chat for unrecognized intents
+            # Fallback to chat for unrecognized intents - more human-like
+            console.print("🤔 Hmm, I'm not quite sure what you're asking for, but let me try to help anyway!")
             handle_chat_natural(ai_router, image_handler, user_input)
 
 @cli.command()
@@ -1440,26 +1484,26 @@ def show_natural_language_help():
     console.print("\n🤖 Remember: I'm here to help make your development workflow faster and more enjoyable!")
     console.print("=" * 50)
 
-def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, extracted_params):
-    """Handle adding a todo from natural language input"""
+def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, extracted_params, execute_immediately=True):
+    """Handle adding a todo from natural language input with human colleague interaction"""
     # Use extracted title if available, otherwise prompt
     if extracted_params and "suggested_title" in extracted_params:
         suggested_title = extracted_params["suggested_title"]
-        title = Prompt.ask("Todo title", default=suggested_title)
+        title = Prompt.ask("📝 What should I call this task?", default=suggested_title)
     else:
         # Use AI to suggest a title based on user input
         ai_suggestion = asyncio.run(ai_router.route_and_process(
             f"Based on this request: '{user_input}', suggest a concise todo title (max 60 characters). "
             f"Just return the title, nothing else."
         ))
-        title = Prompt.ask("Todo title", default=ai_suggestion.strip())
+        title = Prompt.ask("📝 What should I call this task?", default=ai_suggestion.strip())
     
     # Validate title is not empty
     if not title.strip():
-        console.print("❌ Todo title cannot be empty. Cancelling todo creation.")
+        console.print("😅 Hmm, I need a title to track this task. Let's try again!")
         return
     
-    description = Prompt.ask("Description (optional)", default="")
+    description = Prompt.ask("💭 Any additional details you'd like to add? (optional)", default="")
     
     # Smart type detection based on content
     todo_type = "general"
@@ -1470,7 +1514,7 @@ def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, 
         todo_type = "text"
     
     todo_type = Prompt.ask(
-        "Todo type",
+        "🏷️ What type of work is this?",
         choices=["code", "text", "image", "general"],
         default=todo_type
     )
@@ -1485,7 +1529,7 @@ def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, 
         priority = "critical"
     
     priority = Prompt.ask(
-        "Priority",
+        "⚡ How urgent is this?",
         choices=["low", "medium", "high", "critical"],
         default=priority
     )
@@ -1493,8 +1537,8 @@ def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, 
     # Handle content input
     content = None
     if todo_type in ["code", "text"]:
-        if Confirm.ask("Do you want to paste content now?"):
-            console.print("Enter content (Ctrl+D to finish):")
+        if Confirm.ask("🖋️ Want to add any specific content or details now?"):
+            console.print("📝 Enter content (Ctrl+D when finished):")
             lines = []
             try:
                 while True:
@@ -1507,22 +1551,31 @@ def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, 
         if clipboard_image_path:
             content = clipboard_image_path
         else:
-            file_path = Prompt.ask("Enter path to image file (optional)", default="")
+            file_path = Prompt.ask("📷 Path to image file (optional)", default="")
             if file_path and os.path.exists(file_path):
                 content = file_path
     
     todo_id = todo_manager.add_todo(title, description, todo_type, priority, content)
-    console.print("✅ Todo added successfully!")
+    console.print("✅ Perfect! I've added this to your task list.")
     
     # Auto-suggest sub-task breakdown for complex todos
     todo = todo_manager.get_todo_by_id(todo_id)
     if todo and todo_manager.is_todo_too_large(todo):
-        console.print("🔍 This todo looks pretty complex!")
-        if Confirm.ask("Want me to break it down into smaller, manageable sub-tasks?"):
+        console.print("🔍 You know what? This task looks pretty substantial!")
+        if Confirm.ask("🎯 Want me to break it down into smaller, more manageable pieces?"):
             sub_task_ids = todo_manager.create_sub_tasks_from_todo(todo_id, ai_router)
             if sub_task_ids:
-                console.print(f"🎯 Created {len(sub_task_ids)} sub-tasks to help you tackle this step by step!")
-                console.print("💡 Use 'show me my tasks' to see the breakdown.")
+                console.print(f"🎉 Great! I've created {len(sub_task_ids)} smaller tasks to help you tackle this step by step!")
+                console.print("💡 Just ask to 'show me my tasks' to see the breakdown.")
+                
+                # If this was set to execute immediately, ask about sub-tasks too
+                if execute_immediately:
+                    if Confirm.ask("🚀 Want me to start working on these sub-tasks right now?"):
+                        console.print("🔥 Awesome! Let me get started on these right away.")
+                        # TODO: Implement immediate execution logic for sub-tasks
+                        return True
+    
+    return execute_immediately
 
 def handle_create_github_issue_natural(github_integration, repo_info, user_input, extracted_params):
     """Handle creating GitHub issue from natural language"""

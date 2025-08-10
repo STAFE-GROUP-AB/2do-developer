@@ -291,70 +291,74 @@ class TodoManager:
         return sub_task_ids
     
     def _generate_subtasks_with_ai(self, parent_todo: Dict, ai_router) -> List[str]:
-        """Generate sub-tasks using AI analysis"""
+        """Generate sub-tasks using AI analysis with human colleague approach"""
         
         prompt = f"""
-        Analyze the following task and break it down into 3-5 smaller, actionable sub-tasks:
+        As a helpful development colleague, analyze this task and break it down into 3-5 smaller, actionable sub-tasks.
+        Think like a senior developer helping a teammate organize their work.
         
-        Title: {parent_todo['title']}
+        Main Task: {parent_todo['title']}
         Description: {parent_todo['description']}
         Type: {parent_todo['todo_type']}
-        Content: {parent_todo.get('content', 'N/A')}
+        Priority: {parent_todo['priority']}
+        Additional Context: {parent_todo.get('content', 'No additional context')}
         
-        Please provide a numbered list of specific, actionable sub-tasks. Each sub-task should:
-        1. Be independently executable
-        2. Have a clear deliverable
-        3. Take no more than 2-4 hours to complete
-        4. Build towards completing the main task
+        Please create sub-tasks that:
+        1. Are specific and actionable (someone could start working immediately)
+        2. Follow a logical order (planning → implementation → testing → documentation)
+        3. Are sized appropriately (can be completed in 1-4 hours each)
+        4. Cover all aspects of the main task
+        5. Use encouraging, colleague-like language
         
-        Format your response as:
-        1. [Sub-task title] - [Brief description]
-        2. [Sub-task title] - [Brief description]
-        etc.
+        Return ONLY a JSON array of sub-tasks in this exact format:
+        [
+            {{"title": "Plan and design the architecture", "description": "Start by sketching out the overall approach"}},
+            {{"title": "Implement core functionality", "description": "Build the main features step by step"}},
+            {{"title": "Add comprehensive testing", "description": "Ensure everything works reliably"}},
+            {{"title": "Document and polish", "description": "Add docs and final touches"}}
+        ]
         """
         
         try:
+            # Use the AI router to get a response
             import asyncio
-            response = asyncio.run(ai_router.route_and_process(prompt))
-            return self._parse_ai_subtasks_response(response, parent_todo)
-        except Exception as e:
-            print(f"AI sub-task generation failed: {e}")
-            return self._generate_subtasks_simple(parent_todo)
-    
-    def _parse_ai_subtasks_response(self, ai_response: str, parent_todo: Dict) -> List[str]:
-        """Parse AI response and create sub-task todos"""
-        import re
-        
-        sub_task_ids = []
-        
-        # Parse numbered list from AI response
-        lines = ai_response.strip().split('\n')
-        pattern = r'^\d+\.\s*(.+?)\s*-\s*(.+)$'
-        
-        for line in lines:
-            line = line.strip()
-            match = re.match(pattern, line)
-            if match:
-                title = match.group(1).strip()
-                description = match.group(2).strip()
+            import json
+            
+            ai_response = asyncio.run(ai_router.route_and_process(prompt))
+            
+            # Try to parse JSON from the response
+            # Look for JSON array in the response
+            start_idx = ai_response.find('[')
+            end_idx = ai_response.rfind(']') + 1
+            
+            if start_idx != -1 and end_idx != -1:
+                json_str = ai_response[start_idx:end_idx]
+                sub_tasks_data = json.loads(json_str)
                 
-                # Create sub-task
-                sub_task_id = self.add_todo(
-                    title=title,
-                    description=description,
-                    todo_type=parent_todo['todo_type'],
-                    priority=parent_todo['priority'],
-                    content=f"Sub-task of: {parent_todo['title']}"
-                )
-                
-                # Set parent relationship
-                sub_task = self.get_todo_by_id(sub_task_id)
-                if sub_task:
-                    sub_task["parent_id"] = parent_todo["id"]
+                sub_task_ids = []
+                for i, sub_task in enumerate(sub_tasks_data, 1):
+                    # Create each sub-task with the parent's type and adjusted priority
+                    sub_priority = "medium" if parent_todo['priority'] in ["high", "critical"] else "low"
+                    
+                    sub_task_id = self.add_todo(
+                        title=f"{i}. {sub_task['title']}",
+                        description=sub_task['description'],
+                        todo_type=parent_todo['todo_type'],
+                        priority=sub_priority,
+                        content=None,
+                        parent_id=parent_todo['id']
+                    )
                     sub_task_ids.append(sub_task_id)
+                
+                return sub_task_ids
+                
+        except Exception as e:
+            console = Console()
+            console.print(f"🤔 AI sub-task generation had an issue: {e}")
+            console.print("💡 Let me try a simpler approach...")
         
-        self._save_todos()
-        return sub_task_ids
+        # Fallback to simple rule-based splitting
+        return self._generate_subtasks_simple(parent_todo)
     
     def _generate_subtasks_simple(self, parent_todo: Dict) -> List[str]:
         """Generate sub-tasks using simple rule-based approach"""
