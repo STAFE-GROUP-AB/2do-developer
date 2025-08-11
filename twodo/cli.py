@@ -446,11 +446,14 @@ def _start_interactive_session(repo, force_analyze):
                 browser_integration.stop_browser_mode()
             break
         elif action == "add-todo":
-            # Try smart todo parsing first
-            smart_todo_handled = asyncio.run(automation_engine.handle_smart_todo_creation(user_input))
-            if not smart_todo_handled:
-                # Fallback to traditional todo creation
-                handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params, multitasker=multitasker)
+            # Try simple file modification first for basic requests
+            simple_handled = handle_simple_file_modification(user_input, working_dir)
+            if not simple_handled:
+                # Try smart todo parsing
+                smart_todo_handled = asyncio.run(automation_engine.handle_smart_todo_creation(user_input))
+                if not smart_todo_handled:
+                    # Fallback to traditional todo creation
+                    handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, intent_match.extracted_params, multitasker=multitasker)
         elif action == "list-todos":
             handle_list_todos(todo_manager)
         elif action == "remove-todo":
@@ -897,6 +900,65 @@ def ai_list(show_free, show_configured):
     ai_router = AIRouter(config_manager)
     
     _display_ai_models(ai_router, config_manager, show_free, show_configured)
+
+def handle_simple_file_modification(user_input: str, working_dir: str) -> bool:
+    """Handle simple file modifications directly without verbose todo creation"""
+    import re
+    
+    # Simple patterns for direct file modification
+    simple_patterns = [
+        # "add X to [end of] file.ext"
+        (r'add\s+([^"]+?)\s+to\s+(?:the\s+end\s+of\s+)?([^\s]+\.(md|txt|py|js|html|css|json))', 'append'),
+        # "add X to file.ext"
+        (r'add\s+([^"]+?)\s+to\s+([^\s]+\.(md|txt|py|js|html|css|json))', 'append'),
+    ]
+    
+    for pattern, action in simple_patterns:
+        match = re.search(pattern, user_input, re.IGNORECASE)
+        if match:
+            content = match.group(1).strip()
+            filename = match.group(2).strip()
+            
+            # Resolve file path
+            if not os.path.isabs(filename):
+                file_path = os.path.join(working_dir, filename)
+            else:
+                file_path = filename
+            
+            # Check if file exists
+            if not os.path.exists(file_path):
+                console.print(f"❌ File not found: {filename}")
+                return False
+            
+            # Simple confirmation
+            console.print(f"📝 I'll add '{content}' to the end of {filename}")
+            if Confirm.ask("Proceed?", default=True):
+                try:
+                    # Read current content
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        current_content = f.read()
+                    
+                    # Add content to end
+                    if not current_content.endswith('\n'):
+                        new_content = current_content + '\n' + content
+                    else:
+                        new_content = current_content + content
+                    
+                    # Write back
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
+                    
+                    console.print(f"✅ Added '{content}' to {filename}")
+                    return True
+                    
+                except Exception as e:
+                    console.print(f"❌ Error modifying file: {e}")
+                    return False
+            else:
+                console.print("❌ File modification cancelled")
+                return False
+    
+    return False
 
 def handle_add_todo(todo_manager, ai_router, image_handler):
     """Handle adding a new todo item"""
