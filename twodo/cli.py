@@ -3427,6 +3427,480 @@ def _get_task_config(task_type):
         
     return config
 
+
+# Agent Communication Commands
+@cli.command()
+@click.option('--register', '-r', is_flag=True, help='Register this agent in the network')
+@click.option('--name', '-n', help='Optional agent name (default: Agent-{repo_name})')
+def agent_status(register, name):
+    """Show agent network status and discover other online agents"""
+    from .agent_registry import AgentRegistry
+    from .agent_communicator import AgentCommunicator
+    from .agent_heartbeat import get_agent_heartbeat_service, is_agent_heartbeat_running
+    
+    console.print(Panel.fit("🤖 Agent Network Status", style="bold cyan"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        agent_registry = AgentRegistry(config_manager)
+        
+        # Show heartbeat service status
+        heartbeat_running = is_agent_heartbeat_running()
+        heartbeat_service = get_agent_heartbeat_service()
+        
+        console.print(f"🔄 Background Service: {'🟢 Running' if heartbeat_running else '🔴 Stopped'}")
+        if heartbeat_service:
+            status = heartbeat_service.get_status()
+            console.print(f"   Active Collaborations: {status['active_collaborations']}")
+        console.print()
+        
+        if register:
+            # Register this agent
+            agent_info = agent_registry.register_agent(name)
+            console.print(f"✅ Agent registered: {agent_info.agent_name}")
+            console.print(f"📍 Repository: {agent_info.repo_name}")
+            console.print(f"🛠️  Tech Stack: {', '.join(agent_info.tech_stack)}")
+            console.print(f"💼 Capabilities: {', '.join(agent_info.capabilities)}")
+            console.print()
+        
+        # Show online agents
+        online_agents = agent_registry.get_online_agents()
+        
+        if not online_agents:
+            console.print("🔍 No other agents currently online")
+            console.print("💡 Run '2do agent-status --register' in other repositories to discover agents")
+            if not heartbeat_running:
+                console.print("💡 Run '2do agent-daemon' to start background agent service")
+            return
+        
+        console.print(f"🌐 Found {len(online_agents)} online agent(s):")
+        
+        # Create table of agents
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Agent", style="cyan", width=20)
+        table.add_column("Repository", style="green", width=25)
+        table.add_column("Tech Stack", style="yellow", width=30)
+        table.add_column("Status", style="blue", width=10)
+        table.add_column("Last Seen", style="dim", width=15)
+        
+        for agent in online_agents:
+            tech_stack_str = ", ".join(agent.tech_stack[:3])  # Show first 3 technologies
+            if len(agent.tech_stack) > 3:
+                tech_stack_str += "..."
+            
+            # Calculate time since last heartbeat
+            import time
+            time_diff = int(time.time() - agent.last_heartbeat)
+            if time_diff < 60:
+                last_seen = f"{time_diff}s ago"
+            elif time_diff < 3600:
+                last_seen = f"{time_diff // 60}m ago"
+            else:
+                last_seen = f"{time_diff // 3600}h ago"
+            
+            table.add_row(
+                agent.agent_name or f"Agent-{agent.repo_name}",
+                agent.repo_name,
+                tech_stack_str,
+                agent.status,
+                last_seen
+            )
+        
+        console.print(table)
+        
+        # Show collaboration opportunities
+        if online_agents:
+            console.print("\n🤝 Collaboration Commands:")
+            console.print("  • [bold]2do agent-help[/bold] - Request help from other agents")
+            console.print("  • [bold]2do agent-collaborate[/bold] - Start collaboration session")
+            console.print("  • [bold]2do agent-messages[/bold] - Check messages from other agents")
+            console.print("  • [bold]2do agent-daemon[/bold] - Start background agent service")
+            
+    except Exception as e:
+        console.print(f"❌ Error accessing agent network: {e}")
+
+
+@cli.command()
+@click.option('--name', '-n', help='Agent name for this repository')
+@click.option('--stop', is_flag=True, help='Stop the background agent service')
+@click.option('--status', is_flag=True, help='Show background service status')
+def agent_daemon(name, stop, status):
+    """Start/stop background agent service for continuous presence"""
+    from .agent_heartbeat import (start_agent_heartbeat, stop_agent_heartbeat, 
+                                  get_agent_heartbeat_service, is_agent_heartbeat_running)
+    
+    console.print(Panel.fit("🔄 Agent Background Service", style="bold blue"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        
+        if stop:
+            if is_agent_heartbeat_running():
+                stop_agent_heartbeat()
+                console.print("✅ Background agent service stopped")
+            else:
+                console.print("ℹ️  Background agent service was not running")
+            return
+        
+        if status:
+            heartbeat_service = get_agent_heartbeat_service()
+            if heartbeat_service:
+                service_status = heartbeat_service.get_status()
+                console.print(f"🔄 Status: {'🟢 Running' if service_status['running'] else '🔴 Stopped'}")
+                console.print(f"📡 Agent ID: {service_status['agent_id']}")
+                console.print(f"🌐 Online Agents: {service_status['online_agents_count']}")
+                console.print(f"🤝 Active Collaborations: {service_status['active_collaborations']}")
+                console.print(f"💓 Heartbeat Interval: {service_status['heartbeat_interval']}s")
+            else:
+                console.print("🔴 Background agent service is not running")
+            return
+        
+        # Start the service
+        if is_agent_heartbeat_running():
+            console.print("ℹ️  Background agent service is already running")
+            console.print("💡 Use --status to check status or --stop to stop")
+            return
+        
+        console.print("🚀 Starting background agent service...")
+        heartbeat_service = start_agent_heartbeat(config_manager, name)
+        
+        service_status = heartbeat_service.get_status()
+        console.print(f"✅ Agent service started!")
+        console.print(f"📡 Agent ID: {service_status['agent_id']}")
+        console.print(f"💓 Heartbeat every {service_status['heartbeat_interval']} seconds")
+        console.print()
+        console.print("🔧 The service will:")
+        console.print("  • Maintain presence in the agent network")
+        console.print("  • Clean up stale agent entries")
+        console.print("  • Handle incoming collaboration requests")
+        console.print("  • Continue running until stopped or process ends")
+        console.print()
+        console.print("💡 Use 'Ctrl+C' to stop or '2do agent-daemon --stop'")
+        
+        # Keep the main thread alive if running interactively
+        if _is_terminal_interactive():
+            try:
+                while heartbeat_service.is_running():
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                console.print("\n⏹️  Stopping background agent service...")
+                stop_agent_heartbeat()
+                console.print("✅ Service stopped")
+                
+    except Exception as e:
+        console.print(f"❌ Error with background agent service: {e}")
+
+
+@cli.command()
+@click.option('--register', '-r', is_flag=True, help='Register this agent in the network')
+@click.option('--name', '-n', help='Optional agent name (default: Agent-{repo_name})')
+def agent_status(register, name):
+    """Show agent network status and discover other online agents"""
+    from .agent_registry import AgentRegistry
+    from .agent_communicator import AgentCommunicator
+    
+    console.print(Panel.fit("🤖 Agent Network Status", style="bold cyan"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        agent_registry = AgentRegistry(config_manager)
+        
+        if register:
+            # Register this agent
+            agent_info = agent_registry.register_agent(name)
+            console.print(f"✅ Agent registered: {agent_info.agent_name}")
+            console.print(f"📍 Repository: {agent_info.repo_name}")
+            console.print(f"🛠️  Tech Stack: {', '.join(agent_info.tech_stack)}")
+            console.print(f"💼 Capabilities: {', '.join(agent_info.capabilities)}")
+            console.print()
+        
+        # Show online agents
+        online_agents = agent_registry.get_online_agents()
+        
+        if not online_agents:
+            console.print("🔍 No other agents currently online")
+            console.print("💡 Run '2do agent-status --register' in other repositories to discover agents")
+            return
+        
+        console.print(f"🌐 Found {len(online_agents)} online agent(s):")
+        
+        # Create table of agents
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Agent", style="cyan", width=20)
+        table.add_column("Repository", style="green", width=25)
+        table.add_column("Tech Stack", style="yellow", width=30)
+        table.add_column("Status", style="blue", width=10)
+        table.add_column("Last Seen", style="dim", width=15)
+        
+        for agent in online_agents:
+            tech_stack_str = ", ".join(agent.tech_stack[:3])  # Show first 3 technologies
+            if len(agent.tech_stack) > 3:
+                tech_stack_str += "..."
+            
+            # Calculate time since last heartbeat
+            import time
+            time_diff = int(time.time() - agent.last_heartbeat)
+            if time_diff < 60:
+                last_seen = f"{time_diff}s ago"
+            elif time_diff < 3600:
+                last_seen = f"{time_diff // 60}m ago"
+            else:
+                last_seen = f"{time_diff // 3600}h ago"
+            
+            table.add_row(
+                agent.agent_name or f"Agent-{agent.repo_name}",
+                agent.repo_name,
+                tech_stack_str,
+                agent.status,
+                last_seen
+            )
+        
+        console.print(table)
+        
+        # Show collaboration opportunities
+        if online_agents:
+            console.print("\n🤝 Collaboration Commands:")
+            console.print("  • [bold]2do agent-help[/bold] - Request help from other agents")
+            console.print("  • [bold]2do agent-collaborate[/bold] - Start collaboration session")
+            console.print("  • [bold]2do agent-messages[/bold] - Check messages from other agents")
+            
+    except Exception as e:
+        console.print(f"❌ Error accessing agent network: {e}")
+
+
+@cli.command()
+@click.option('--title', '-t', prompt='Help request title', help='Brief title for the help request')
+@click.option('--description', '-d', prompt='Describe what you need help with', help='Detailed description')
+@click.option('--tech', '-tech', help='Required technologies (comma-separated)')
+@click.option('--capability', '-c', help='Required capabilities (comma-separated)')
+@click.option('--priority', '-p', type=click.Choice(['low', 'medium', 'high', 'urgent']), default='medium')
+def agent_help(title, description, tech, capability, priority):
+    """Request help from other agents in the network"""
+    from .agent_registry import AgentRegistry
+    from .agent_communicator import AgentCommunicator
+    
+    console.print(Panel.fit("🆘 Request Agent Help", style="bold yellow"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        agent_registry = AgentRegistry(config_manager)
+        agent_communicator = AgentCommunicator(config_manager, agent_registry)
+        
+        # Ensure this agent is registered
+        agent_registry.register_agent()
+        
+        # Parse tech stack and capabilities
+        tech_stack = [t.strip() for t in tech.split(',')] if tech else []
+        capabilities = [c.strip() for c in capability.split(',')] if capability else []
+        
+        # If not specified, auto-detect some requirements
+        if not tech_stack and not capabilities:
+            repo_info = agent_registry._get_repo_info()
+            tech_stack = repo_info['tech_stack'][:3]  # Use first 3 technologies
+            capabilities = ['general-development', 'code-review']
+        
+        console.print(f"📤 Sending help request: {title}")
+        console.print(f"🎯 Priority: {priority}")
+        console.print(f"🛠️  Tech requirements: {', '.join(tech_stack) if tech_stack else 'Any'}")
+        console.print(f"💼 Capability requirements: {', '.join(capabilities) if capabilities else 'General'}")
+        
+        # Send help request
+        request_id = agent_communicator.send_help_request(
+            title=title,
+            description=description,
+            required_capabilities=capabilities,
+            tech_stack=tech_stack,
+            priority=priority
+        )
+        
+        console.print(f"✅ Help request sent! Request ID: {request_id}")
+        console.print("⏳ Waiting for responses from other agents...")
+        console.print("💡 Use '2do agent-messages' to check for replies")
+        
+    except Exception as e:
+        console.print(f"❌ Error sending help request: {e}")
+
+
+@cli.command()
+@click.option('--unread-only', '-u', is_flag=True, help='Show only unread messages')
+def agent_messages(unread_only):
+    """Check messages from other agents"""
+    from .agent_registry import AgentRegistry
+    from .agent_communicator import AgentCommunicator, MessageType
+    
+    console.print(Panel.fit("📬 Agent Messages", style="bold blue"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        agent_registry = AgentRegistry(config_manager)
+        agent_communicator = AgentCommunicator(config_manager, agent_registry)
+        
+        # Get messages
+        messages = agent_communicator.get_messages()
+        
+        if not messages:
+            console.print("📭 No messages from other agents")
+            return
+        
+        console.print(f"📨 Found {len(messages)} message(s):")
+        
+        for i, message in enumerate(messages, 1):
+            # Get sender info
+            sender_agent = agent_registry.get_agent_by_id(message.from_agent_id)
+            sender_name = sender_agent.agent_name if sender_agent else message.from_agent_id[:8]
+            
+            console.print(f"\n[bold]{i}. {message.message_type.value.replace('_', ' ').title()}[/bold]")
+            console.print(f"   From: {sender_name}")
+            console.print(f"   Time: {datetime.fromtimestamp(message.timestamp).strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            if message.message_type == MessageType.HELP_REQUEST:
+                help_req = message.content['help_request']
+                console.print(f"   Title: {help_req['title']}")
+                console.print(f"   Description: {help_req['description']}")
+                console.print(f"   Tech: {', '.join(help_req['tech_stack'])}")
+                console.print(f"   Priority: {help_req['priority']}")
+                
+                # Prompt to offer help
+                if Confirm.ask(f"   Offer help for this request?"):
+                    offer_message = Prompt.ask("   Your help offer message", 
+                                             default="I can help with this! Let me know how.")
+                    agent_communicator.send_help_offer(message, offer_message)
+                    console.print("   ✅ Help offer sent!")
+                    agent_communicator.mark_message_read(message.message_id)
+                    
+            elif message.message_type == MessageType.HELP_OFFER:
+                console.print(f"   Offer: {message.content['offer_message']}")
+                console.print(f"   Helper experience: {message.content['helper_info']['experience']}")
+                
+                # Prompt to accept/decline
+                if Confirm.ask("   Accept this help offer?"):
+                    agent_communicator.accept_help_offer(message)
+                    console.print("   ✅ Help offer accepted! Collaboration started.")
+                    agent_communicator.mark_message_read(message.message_id)
+                elif Confirm.ask("   Decline this offer?"):
+                    reason = Prompt.ask("   Decline reason (optional)", default="")
+                    agent_communicator.decline_help_offer(message, reason)
+                    console.print("   ❌ Help offer declined.")
+                    agent_communicator.mark_message_read(message.message_id)
+                    
+            elif message.message_type == MessageType.COLLABORATION_MESSAGE:
+                console.print(f"   Message: {message.content['message']}")
+                console.print(f"   Session: {message.content['session_id']}")
+                
+            # Option to mark as read
+            if not unread_only and Confirm.ask("   Mark as read?", default=True):
+                agent_communicator.mark_message_read(message.message_id)
+        
+    except Exception as e:
+        console.print(f"❌ Error checking messages: {e}")
+
+
+@cli.command()
+@click.option('--session-id', '-s', help='Specific collaboration session ID')
+def agent_collaborate(session_id):
+    """Start or join a collaboration session with another agent"""
+    from .agent_registry import AgentRegistry
+    from .agent_communicator import AgentCommunicator
+    
+    console.print(Panel.fit("🤝 Agent Collaboration", style="bold green"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        agent_registry = AgentRegistry(config_manager)
+        agent_communicator = AgentCommunicator(config_manager, agent_registry)
+        
+        # Get active collaborations
+        active_collaborations = agent_communicator.get_active_collaborations()
+        
+        if session_id:
+            # Join specific session
+            session = next((s for s in active_collaborations if s.session_id == session_id), None)
+            if not session:
+                console.print(f"❌ Session {session_id} not found or not active")
+                return
+        elif active_collaborations:
+            # Show active sessions and let user choose
+            console.print("🔄 Active collaboration sessions:")
+            for i, session in enumerate(active_collaborations, 1):
+                other_agent_id = (session.helper_agent_id if session.requester_agent_id == agent_registry.agent_id 
+                                else session.requester_agent_id)
+                other_agent = agent_registry.get_agent_by_id(other_agent_id)
+                other_name = other_agent.agent_name if other_agent else other_agent_id[:8]
+                
+                console.print(f"  {i}. With {other_name} (Session: {session.session_id[:8]}...)")
+            
+            if len(active_collaborations) == 1:
+                session = active_collaborations[0]
+            else:
+                choice = int(Prompt.ask("Choose session", choices=[str(i) for i in range(1, len(active_collaborations) + 1)]))
+                session = active_collaborations[choice - 1]
+        else:
+            console.print("❌ No active collaboration sessions found")
+            console.print("💡 Use '2do agent-help' to request help and start a collaboration")
+            return
+        
+        # Start collaboration chat
+        console.print(f"💬 Collaboration chat started (Session: {session.session_id[:8]}...)")
+        console.print("💡 Type 'exit' to end, 'help' for commands, or chat naturally")
+        
+        other_agent_id = (session.helper_agent_id if session.requester_agent_id == agent_registry.agent_id 
+                         else session.requester_agent_id)
+        other_agent = agent_registry.get_agent_by_id(other_agent_id)
+        other_name = other_agent.agent_name if other_agent else "Other Agent"
+        
+        console.print(f"🤖 Collaborating with: {other_name}")
+        
+        # Chat loop
+        while True:
+            try:
+                message = Prompt.ask(f"[bold cyan]You[/bold cyan]")
+                
+                if message.lower() == 'exit':
+                    if Confirm.ask("End collaboration session?"):
+                        agent_communicator.end_collaboration(session.session_id, "completed")
+                        console.print("✅ Collaboration ended")
+                        break
+                    continue
+                    
+                elif message.lower() == 'help':
+                    console.print("🔧 Collaboration Commands:")
+                    console.print("  • exit - End collaboration")
+                    console.print("  • help - Show this help")
+                    console.print("  • Just type naturally to chat with the other agent")
+                    continue
+                
+                # Send collaboration message
+                agent_communicator.send_collaboration_message(session.session_id, message)
+                console.print(f"✅ Message sent to {other_name}")
+                
+                # Check for new messages
+                import time
+                time.sleep(1)  # Brief pause
+                messages = agent_communicator.get_messages([MessageType.COLLABORATION_MESSAGE])
+                for msg in messages:
+                    if msg.content.get('session_id') == session.session_id:
+                        sender_agent = agent_registry.get_agent_by_id(msg.from_agent_id)
+                        sender_name = sender_agent.agent_name if sender_agent else "Other Agent"
+                        console.print(f"[bold green]{sender_name}[/bold green]: {msg.content['message']}")
+                        agent_communicator.mark_message_read(msg.message_id)
+                
+            except KeyboardInterrupt:
+                console.print("\n⏸️  Collaboration paused. Use 'exit' to end properly.")
+                break
+            except Exception as e:
+                console.print(f"❌ Error in collaboration: {e}")
+                break
+                
+    except Exception as e:
+        console.print(f"❌ Error starting collaboration: {e}")
+
+
 def main():
     """Main entry point"""
     cli()
