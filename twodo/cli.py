@@ -3901,6 +3901,462 @@ def agent_collaborate(session_id):
         console.print(f"❌ Error starting collaboration: {e}")
 
 
+@cli.command("claude-code")
+@click.option('--mode', default='auto', type=click.Choice(['auto', 'tall-stack', 'flutter', 'laravel', 'react']),
+              help='Specialized Claude Code mode for different frameworks')
+@click.option('--interactive', is_flag=True, help='Enable interactive Claude Code mode')
+@click.option('--prefer-claude', is_flag=True, default=True, help='Strongly prefer Claude models (default: True)')
+@click.argument('prompt', required=False)
+def claude_code(mode, interactive, prefer_claude, prompt):
+    """🚀 Claude Code Engine - Ultimate Claude-powered development assistant
+    
+    Optimized for TALL Stack (Tailwind, Alpine.js, Laravel, Livewire) and Flutter development.
+    Makes Claude models the primary engine with specialized optimizations.
+    
+    Examples:
+        2do claude-code "Build a Laravel user authentication system"
+        2do claude-code --mode tall-stack "Create a Livewire component for user profile"
+        2do claude-code --mode flutter "Design a mobile app login screen"
+        2do claude-code --interactive
+    """
+    from .config import ConfigManager
+    from .ai_router import AIRouter
+    from .tech_stack import TechStackDetector
+    
+    # Header for Claude Code mode
+    console.print(Panel.fit(
+        "🚀 [bold blue]Claude Code Engine[/bold blue] - AI-Powered Development Assistant\n"
+        "✨ Optimized for TALL Stack & Flutter with Claude AI",
+        style="bold cyan"
+    ))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        
+        # Enable Claude-first mode
+        if prefer_claude:
+            config_manager.set_preference("claude_first_mode", True)
+            config_manager.set_preference("preferred_default_model", "claude-opus-4-20250514")
+            console.print("🎯 [bold green]Claude-first mode enabled[/bold green] - Claude models will be prioritized")
+        
+        # Set specialized mode preference
+        if mode != 'auto':
+            config_manager.set_preference("claude_code_specialization", mode)
+            console.print(f"🔧 [bold yellow]Specialized mode:[/bold yellow] {mode}")
+        
+        # Detect current project type if not specified
+        tech_detector = TechStackDetector(working_dir)
+        detected_tech = tech_detector.detect_stack()
+        
+        if mode == 'auto' and detected_tech:
+            # Auto-detect specialization based on project
+            if any(tech in detected_tech for tech in ['laravel', 'php', 'blade']):
+                mode = 'tall-stack'
+                console.print("🔍 [bold green]Auto-detected:[/bold green] TALL Stack project")
+            elif any(tech in detected_tech for tech in ['flutter', 'dart']):
+                mode = 'flutter'
+                console.print("🔍 [bold green]Auto-detected:[/bold green] Flutter project")
+            elif any(tech in detected_tech for tech in ['react', 'nextjs']):
+                mode = 'react'
+                console.print("🔍 [bold green]Auto-detected:[/bold green] React project")
+        
+        # Display current configuration
+        _display_claude_code_status(config_manager, mode, detected_tech)
+        
+        if interactive or not prompt:
+            _run_claude_code_interactive(config_manager, mode)
+        else:
+            _run_claude_code_single(config_manager, mode, prompt)
+            
+    except Exception as e:
+        console.print(f"❌ Error in Claude Code mode: {e}")
+        raise click.ClickException("Claude Code engine failed")
+
+
+def _display_claude_code_status(config_manager, mode, detected_tech):
+    """Display current Claude Code configuration and capabilities"""
+    
+    # Create status table
+    table = Table(title="🚀 Claude Code Engine Status", show_header=True, header_style="bold magenta")
+    table.add_column("Feature", style="cyan", width=20)
+    table.add_column("Status", style="green", width=30)
+    table.add_column("Details", style="white")
+    
+    # Claude model availability
+    ai_router = AIRouter(config_manager)
+    claude_models = [name for name in ai_router.models.keys() if 'claude' in name.lower()]
+    claude_status = f"✅ {len(claude_models)} models" if claude_models else "❌ Not configured"
+    table.add_row("Claude Models", claude_status, ", ".join(claude_models[:3]))
+    
+    # Mode status
+    mode_display = mode.upper() if mode != 'auto' else 'Auto-Detection'
+    table.add_row("Specialization", f"🎯 {mode_display}", "Framework-optimized prompts")
+    
+    # Claude-first preference
+    claude_first = config_manager.get_preference("claude_first_mode", False)
+    claude_status = "✅ Enabled" if claude_first else "⚪ Standard routing"
+    table.add_row("Claude Priority", claude_status, "Claude models preferred")
+    
+    # Tech stack detection
+    if detected_tech:
+        tech_list = ", ".join(detected_tech[:3])
+        table.add_row("Detected Stack", "✅ Active", tech_list)
+    else:
+        table.add_row("Detected Stack", "⚪ None", "Working in generic mode")
+    
+    # MCP servers
+    mcp_servers = config_manager.get_mcp_servers() or []
+    mcp_status = f"✅ {len(mcp_servers)} servers" if mcp_servers else "⚪ Basic mode"
+    table.add_row("MCP Integration", mcp_status, "Enhanced AI capabilities")
+    
+    console.print(table)
+
+
+def _run_claude_code_interactive(config_manager, mode):
+    """Run Claude Code in interactive mode"""
+    console.print("\n💬 [bold yellow]Interactive Claude Code Session[/bold yellow]")
+    console.print("Type 'exit' to quit, 'help' for commands, or describe what you want to build:")
+    
+    ai_router = AIRouter(config_manager)
+    
+    while True:
+        try:
+            user_input = Prompt.ask("\n[bold cyan]Claude Code[/bold cyan]")
+            
+            if user_input.lower() == 'exit':
+                console.print("👋 Goodbye! Happy coding with Claude!")
+                break
+            elif user_input.lower() == 'help':
+                _show_claude_code_help(mode)
+                continue
+            elif user_input.lower().startswith('mode '):
+                new_mode = user_input.split(' ', 1)[1]
+                if new_mode in ['tall-stack', 'flutter', 'laravel', 'react', 'auto']:
+                    mode = new_mode
+                    config_manager.set_preference("claude_code_specialization", mode)
+                    console.print(f"🔧 Switched to {mode} mode")
+                else:
+                    console.print("❌ Invalid mode. Available: tall-stack, flutter, laravel, react, auto")
+                continue
+            
+            # Process with Claude Code optimizations
+            enhanced_prompt = _enhance_prompt_for_claude_code(user_input, mode)
+            
+            # Use AI router with Claude preference
+            response = asyncio.run(ai_router.route_prompt(enhanced_prompt))
+            console.print(f"\n✨ [bold green]Claude Response:[/bold green]\n{response}")
+            
+        except KeyboardInterrupt:
+            console.print("\n👋 Session ended. Happy coding!")
+            break
+        except Exception as e:
+            console.print(f"❌ Error: {e}")
+
+
+def _run_claude_code_single(config_manager, mode, prompt):
+    """Run a single Claude Code prompt"""
+    console.print(f"\n🚀 [bold yellow]Processing with Claude Code Engine...[/bold yellow]")
+    
+    try:
+        ai_router = AIRouter(config_manager)
+        enhanced_prompt = _enhance_prompt_for_claude_code(prompt, mode)
+        
+        response = asyncio.run(ai_router.route_prompt(enhanced_prompt))
+        console.print(f"\n✨ [bold green]Claude Response:[/bold green]\n{response}")
+        
+    except Exception as e:
+        console.print(f"❌ Error processing prompt: {e}")
+
+
+def _enhance_prompt_for_claude_code(prompt, mode):
+    """Enhance prompts with Claude Code optimizations based on mode"""
+    
+    base_enhancement = """You are Claude Code, an expert AI development assistant specializing in modern web development. 
+Focus on best practices, clean code, and framework-specific optimizations."""
+    
+    mode_enhancements = {
+        'tall-stack': """
+TALL Stack Specialization (Tailwind CSS, Alpine.js, Laravel, Livewire):
+- Use Laravel 11+ conventions and modern syntax
+- Prefer Livewire 3.x components for interactivity
+- Implement Tailwind CSS utility-first styling
+- Use Alpine.js for lightweight frontend interactions
+- Follow Laravel best practices (Eloquent, validation, authorization)
+- Consider Pest for testing
+- Use modern PHP 8.3+ features
+""",
+        'flutter': """
+Flutter Specialization:
+- Use Flutter 3.x+ features and latest Dart syntax
+- Follow Material Design 3 guidelines
+- Implement proper state management (Riverpod, Bloc, or Provider)
+- Use null safety and modern Dart patterns
+- Consider responsive design for multiple screen sizes
+- Follow Flutter best practices for performance
+""",
+        'laravel': """
+Laravel Specialization:
+- Use Laravel 11+ features and conventions
+- Implement proper MVC architecture
+- Use Eloquent ORM efficiently
+- Follow Laravel best practices for security
+- Consider API resources for JSON responses
+- Use Laravel's built-in features (validation, authorization, etc.)
+""",
+        'react': """
+React Specialization:
+- Use React 18+ with modern hooks and patterns
+- Implement proper TypeScript if applicable
+- Follow React best practices for performance
+- Use modern state management solutions
+- Consider Next.js for full-stack applications
+- Implement proper error boundaries and loading states
+"""
+    }
+    
+    enhancement = base_enhancement
+    if mode in mode_enhancements:
+        enhancement += mode_enhancements[mode]
+    
+    return f"{enhancement}\n\nUser Request: {prompt}"
+
+
+def _show_claude_code_help(current_mode):
+    """Show Claude Code help information"""
+    console.print("\n🆘 [bold yellow]Claude Code Help[/bold yellow]")
+    console.print("Commands:")
+    console.print("  • [bold]exit[/bold] - End Claude Code session")
+    console.print("  • [bold]help[/bold] - Show this help")
+    console.print("  • [bold]mode <type>[/bold] - Switch specialization mode")
+    console.print("\nAvailable modes:")
+    console.print("  • [bold]tall-stack[/bold] - Tailwind, Alpine.js, Laravel, Livewire")
+    console.print("  • [bold]flutter[/bold] - Flutter & Dart development")
+    console.print("  • [bold]laravel[/bold] - Laravel PHP framework")
+    console.print("  • [bold]react[/bold] - React & Next.js")
+    console.print("  • [bold]auto[/bold] - Auto-detect based on project")
+    console.print(f"\nCurrent mode: [bold green]{current_mode}[/bold green]")
+    console.print("\nJust describe what you want to build, and Claude will help with specialized knowledge!")
+
+
+@cli.command("tall-stack")
+@click.argument('task', required=False)
+@click.option('--component', '-c', help='Create a Livewire component')
+@click.option('--model', '-m', help='Create an Eloquent model with migration')
+@click.option('--route', '-r', help='Create routes and controller methods')
+@click.option('--scaffold', is_flag=True, help='Full TALL stack scaffold')
+def tall_stack(task, component, model, route, scaffold):
+    """🏗️ TALL Stack Assistant - Specialized Laravel + Livewire + Alpine + Tailwind helper
+    
+    Quick shortcuts for common TALL stack development tasks.
+    Powered by Claude Code engine for best-in-class PHP/Laravel assistance.
+    
+    Examples:
+        2do tall-stack "Build a user profile management system"
+        2do tall-stack --component UserProfile
+        2do tall-stack --model Post --scaffold
+        2do tall-stack --route "user profile edit and update"
+    """
+    from .config import ConfigManager
+    from .ai_router import AIRouter
+    
+    console.print(Panel.fit(
+        "🏗️ [bold green]TALL Stack Assistant[/bold green]\n"
+        "🚀 Tailwind • Alpine.js • Laravel • Livewire",
+        style="bold cyan"
+    ))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        
+        # Enable Claude-first mode for TALL stack
+        config_manager.set_preference("claude_first_mode", True)
+        config_manager.set_preference("claude_code_specialization", "tall-stack")
+        config_manager.set_preference("preferred_default_model", "claude-opus-4-20250514")
+        
+        ai_router = AIRouter(config_manager)
+        
+        prompt_parts = []
+        
+        if component:
+            prompt_parts.append(f"Create a Livewire component named '{component}' with proper TALL stack conventions")
+        
+        if model:
+            prompt_parts.append(f"Create an Eloquent model '{model}' with migration, factory, and seeder")
+        
+        if route:
+            prompt_parts.append(f"Create routes and controller methods for: {route}")
+        
+        if scaffold:
+            prompt_parts.append("Include full scaffolding with views, validation, and tests")
+        
+        if task:
+            prompt_parts.append(f"Main task: {task}")
+        
+        if not prompt_parts:
+            console.print("❌ Please provide a task or use one of the options (--component, --model, --route)")
+            return
+        
+        # Combine all requirements
+        full_prompt = " AND ".join(prompt_parts)
+        enhanced_prompt = _enhance_prompt_for_claude_code(full_prompt, "tall-stack")
+        
+        console.print("🚀 [bold yellow]Processing with Claude TALL Stack expertise...[/bold yellow]")
+        response = asyncio.run(ai_router.route_prompt(enhanced_prompt))
+        console.print(f"\n✨ [bold green]Claude TALL Stack Response:[/bold green]\n{response}")
+        
+    except Exception as e:
+        console.print(f"❌ Error in TALL Stack assistant: {e}")
+
+
+@cli.command("flutter-dev")
+@click.argument('task', required=False)
+@click.option('--widget', '-w', help='Create a Flutter widget')
+@click.option('--screen', '-s', help='Create a full screen/page')
+@click.option('--state', help='Add state management (bloc/provider/riverpod)')
+@click.option('--responsive', is_flag=True, help='Make it responsive for all screen sizes')
+def flutter_dev(task, widget, screen, state, responsive):
+    """📱 Flutter Development Assistant - Specialized Flutter & Dart helper
+    
+    Quick shortcuts for common Flutter development tasks.
+    Powered by Claude Code engine for expert Flutter assistance.
+    
+    Examples:
+        2do flutter-dev "Build a login screen with validation"
+        2do flutter-dev --widget CustomButton --responsive
+        2do flutter-dev --screen UserProfile --state riverpod
+        2do flutter-dev "Create a shopping cart with state management"
+    """
+    from .config import ConfigManager
+    from .ai_router import AIRouter
+    
+    console.print(Panel.fit(
+        "📱 [bold blue]Flutter Development Assistant[/bold blue]\n"
+        "🚀 Flutter • Dart • Material Design 3",
+        style="bold cyan"
+    ))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        
+        # Enable Claude-first mode for Flutter
+        config_manager.set_preference("claude_first_mode", True)
+        config_manager.set_preference("claude_code_specialization", "flutter")
+        config_manager.set_preference("preferred_default_model", "claude-opus-4-20250514")
+        
+        ai_router = AIRouter(config_manager)
+        
+        prompt_parts = []
+        
+        if widget:
+            prompt_parts.append(f"Create a Flutter widget named '{widget}' following Material Design 3 guidelines")
+        
+        if screen:
+            prompt_parts.append(f"Create a complete Flutter screen/page for '{screen}' with proper navigation")
+        
+        if state:
+            prompt_parts.append(f"Implement state management using {state} (BLoC/Provider/Riverpod)")
+        
+        if responsive:
+            prompt_parts.append("Make it responsive for mobile, tablet, and desktop screens")
+        
+        if task:
+            prompt_parts.append(f"Main task: {task}")
+        
+        if not prompt_parts:
+            console.print("❌ Please provide a task or use one of the options (--widget, --screen, --state)")
+            return
+        
+        # Combine all requirements
+        full_prompt = " AND ".join(prompt_parts)
+        enhanced_prompt = _enhance_prompt_for_claude_code(full_prompt, "flutter")
+        
+        console.print("🚀 [bold yellow]Processing with Claude Flutter expertise...[/bold yellow]")
+        response = asyncio.run(ai_router.route_prompt(enhanced_prompt))
+        console.print(f"\n✨ [bold green]Claude Flutter Response:[/bold green]\n{response}")
+        
+    except Exception as e:
+        console.print(f"❌ Error in Flutter assistant: {e}")
+
+
+@cli.command("claude-status")
+def claude_status():
+    """📊 Claude Code Engine Status - Check Claude model configuration and preferences"""
+    from .config import ConfigManager
+    from .ai_router import AIRouter
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        ai_router = AIRouter(config_manager)
+        
+        console.print(Panel.fit(
+            "📊 [bold blue]Claude Code Engine Status[/bold blue]",
+            style="bold cyan"
+        ))
+        
+        # Claude models table
+        claude_models = [(name, model) for name, model in ai_router.models.items() if 'claude' in name.lower()]
+        
+        if claude_models:
+            table = Table(title="🤖 Available Claude Models", show_header=True, header_style="bold magenta")
+            table.add_column("Model", style="cyan")
+            table.add_column("Status", style="green")
+            table.add_column("Strengths", style="yellow")
+            table.add_column("Context", style="white")
+            
+            for name, model in claude_models:
+                status = "✅ Ready" if config_manager.get_api_key("anthropic") else "❌ No API Key"
+                strengths = ", ".join(model.strengths[:3])
+                context = f"{model.context_length:,} tokens"
+                table.add_row(name, status, strengths, context)
+            
+            console.print(table)
+        else:
+            console.print("❌ No Claude models available. Run '2do add-ai' to configure Anthropic API key.")
+        
+        # Configuration status
+        config_table = Table(title="⚙️ Claude Code Configuration", show_header=True, header_style="bold green")
+        config_table.add_column("Setting", style="cyan")
+        config_table.add_column("Value", style="white")
+        config_table.add_column("Description", style="yellow")
+        
+        claude_first = config_manager.get_preference("claude_first_mode", False)
+        config_table.add_row(
+            "Claude First Mode", 
+            "✅ Enabled" if claude_first else "❌ Disabled",
+            "Heavily prioritize Claude models"
+        )
+        
+        specialization = config_manager.get_preference("claude_code_specialization", "auto")
+        config_table.add_row(
+            "Specialization", 
+            specialization,
+            "Framework-specific optimizations"
+        )
+        
+        preferred_model = config_manager.get_preference("preferred_default_model", "gpt-5")
+        config_table.add_row(
+            "Preferred Model", 
+            preferred_model,
+            "Default model selection"
+        )
+        
+        console.print(config_table)
+        
+        # Quick setup recommendations
+        if not claude_first:
+            console.print("\n💡 [bold yellow]Recommendations:[/bold yellow]")
+            console.print("   • Run [bold]2do claude-code --interactive[/bold] to enable Claude-first mode")
+            console.print("   • Use [bold]2do tall-stack[/bold] for Laravel/Livewire projects")
+            console.print("   • Use [bold]2do flutter-dev[/bold] for Flutter development")
+        
+    except Exception as e:
+        console.print(f"❌ Error checking Claude status: {e}")
+
+
 def main():
     """Main entry point"""
     cli()

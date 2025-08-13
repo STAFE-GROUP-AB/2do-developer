@@ -662,8 +662,42 @@ class AIRouter:
                 if strength in analysis:
                     score += analysis[strength] * 10
             
-            # Enhanced scoring logic
+            # Enhanced scoring logic with Claude Code engine support
             
+            # Claude Code engine mode - heavily prioritize Claude models
+            claude_first_mode = self.config.get_preference("claude_first_mode", False)
+            claude_code_specialization = self.config.get_preference("claude_code_specialization", "auto")
+            
+            if claude_first_mode:
+                # In Claude Code mode, heavily favor Claude models
+                if model.provider == "anthropic":
+                    score += 100  # Massive boost for Claude models in Claude Code mode
+                    if "claude-opus-4" in model.name:
+                        score += 50  # Additional boost for Claude Opus 4
+                    elif "claude-3-5-sonnet" in model.name:
+                        score += 30  # Strong boost for Claude 3.5 Sonnet
+                    elif "claude-3-opus" in model.name:
+                        score += 25  # Good boost for Claude 3 Opus
+                else:
+                    # Significantly reduce score for non-Claude models in Claude Code mode
+                    score -= 50
+            
+            # Claude Code specialization bonuses
+            if claude_code_specialization == "tall-stack":
+                if model.provider == "anthropic":
+                    score += 40  # Claude excels at TALL stack development
+                    if "claude-opus-4" in model.name:
+                        score += 20  # Opus 4 is premier for TALL stack
+            elif claude_code_specialization == "flutter":
+                if model.provider == "anthropic":
+                    score += 30  # Claude is excellent for Flutter/Dart
+                    if "claude-opus-4" in model.name:
+                        score += 15  # Opus 4 handles complex Flutter architecture
+            elif claude_code_specialization == "laravel":
+                if model.provider == "anthropic":
+                    score += 45  # Claude is exceptional at PHP/Laravel
+                    if "claude-opus-4" in model.name or "claude-3-5-sonnet" in model.name:
+                        score += 25  # Top Claude models for Laravel
 
             # Default model preferences - Claude Opus 4 is the premier model for coding
             if "claude-opus-4" in model.name:
