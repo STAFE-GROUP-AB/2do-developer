@@ -1968,21 +1968,33 @@ def handle_chat_natural(ai_router, image_handler, user_input):
     """Handle natural chat - enhanced with developer context"""
     console.print("💬 Let me help you with that...")
     
-    # Clean up old temporary files
-    image_handler.cleanup_old_temp_files()
+    # Check if AI models are available
+    if not ai_router or not hasattr(ai_router, 'models') or not ai_router.models:
+        console.print("❌ I'd love to help, but AI models aren't available right now.")
+        console.print("💡 Please run '2do setup' to configure AI model API keys.")
+        console.print("📝 In the meantime, you can:")
+        console.print("   • Add todos manually with 'add todo'")
+        console.print("   • List your current tasks with 'list todos'")
+        console.print("   • Manage your project setup with '2do verify'")
+        return
+    
+    # Clean up old temporary files  
+    if image_handler:
+        image_handler.cleanup_old_temp_files()
     
     # Check for clipboard image
     clipboard_image_path = None
-    try:
-        image = image_handler.check_clipboard_for_image()
-        if image is not None:
-            console.print("🖼️  I see you have an image in your clipboard!")
-            if Confirm.ask("Should I include this image in my analysis?"):
-                image_handler.display_image_info(image)
-                clipboard_image_path = image_handler.save_image_temporarily(image)
-                console.print(f"✅ Image attached to your question")
-    except Exception:
-        pass  # Silently ignore clipboard errors
+    if image_handler:
+        try:
+            image = image_handler.check_clipboard_for_image()
+            if image is not None:
+                console.print("🖼️  I see you have an image in your clipboard!")
+                if Confirm.ask("Should I include this image in my analysis?"):
+                    image_handler.display_image_info(image)
+                    clipboard_image_path = image_handler.save_image_temporarily(image)
+                    console.print(f"✅ Image attached to your question")
+        except Exception:
+            pass  # Silently ignore clipboard errors
     
     # Enhance the prompt with developer context
     enhanced_prompt = f"""As a developer-focused AI assistant, please help with this request: {user_input}
@@ -1998,20 +2010,25 @@ If this is a technical question, provide clear explanations with code examples w
     # Check if streaming is enabled (default to True for better UX)
     use_streaming = True  # Could be made configurable later
     
-    if use_streaming:
-        console.print("🤖 ", end="")
-        async def stream_chat_response():
-            full_response = ""
-            async for chunk in ai_router.route_and_process_stream(enhanced_prompt):
-                console.print(chunk, end="", flush=True)
-                full_response += chunk
-            return full_response
-        
-        response = asyncio.run(stream_chat_response())
-        console.print("\n")  # New line after streaming
-    else:
-        response = asyncio.run(ai_router.route_and_process(enhanced_prompt))
-        console.print(f"\n🤖 {response}\n")
+    try:
+        if use_streaming:
+            console.print("🤖 ", end="")
+            async def stream_chat_response():
+                full_response = ""
+                async for chunk in ai_router.route_and_process_stream(enhanced_prompt):
+                    console.print(chunk, end="")
+                    full_response += chunk
+                return full_response
+            
+            response = asyncio.run(stream_chat_response())
+            console.print("\n")  # New line after streaming
+        else:
+            response = asyncio.run(ai_router.route_and_process(enhanced_prompt))
+            console.print(f"\n🤖 {response}\n")
+    except Exception as e:
+        console.print(f"\n❌ Sorry, I encountered an issue: {e}")
+        console.print("💡 You might need to check your API keys with '2do setup'")
+        return
     
     # Offer follow-up suggestions
     console.print("💡 Want to do something with this information? Try:")

@@ -1,7 +1,7 @@
 {
   "sessions": [
     {
-      "session_id": "session_1755116856",
+      "session_id": "session_1755117056",
       "allowed_paths": [
         "/home/runner/work/2do-developer/2do-developer"
       ],
@@ -10,19 +10,19 @@
         "/home/runner/work/2do-developer/2do-developer/.*"
       ],
       "read_permissions": [
-        "/home/runner/work/2do-developer/2do-developer",
         "/home/runner/work/2do-developer/2do-developer/**/*",
+        "/home/runner/work/2do-developer/2do-developer",
         "/home/runner/work/2do-developer/2do-developer/.*"
       ],
       "write_permissions": [
-        "/home/runner/work/2do-developer/2do-developer",
         "/home/runner/work/2do-developer/2do-developer/**/*",
+        "/home/runner/work/2do-developer/2do-developer",
         "/home/runner/work/2do-developer/2do-developer/.*"
       ],
       "execute_permissions": [],
-      "created_at": 1755116856.5700321,
-      "last_used": 1755116856.5701401
+      "created_at": 1755117056.6292605,
+      "last_used": 1755117056.629368
     }
   ],
-  "last_cleanup": 1755116856.5702298
+  "last_cleanup": 1755117056.6294863
 }

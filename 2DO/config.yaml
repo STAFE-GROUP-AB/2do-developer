@@ -1,13 +1,12 @@
 analysis:
   analysis_completed: true
-  last_analyzed: '2025-08-13T20:27:38.029961'
+  last_analyzed: '2025-08-13T20:30:58.351265'
   memory_files_created: false
   tech_stack:
   - git
   - kubernetes
   - python
 api_keys:
-  anthropic: sk-invalid
   openai: sk-invalid
 mcp_servers:
 - args:
