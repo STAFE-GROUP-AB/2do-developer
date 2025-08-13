@@ -1778,12 +1778,28 @@ def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, 
         suggested_title = extracted_params["suggested_title"]
         title = Prompt.ask("📝 What should I call this task?", default=suggested_title)
     else:
-        # Use AI to suggest a title based on user input
-        ai_suggestion = asyncio.run(ai_router.route_and_process(
-            f"Based on this request: '{user_input}', suggest a concise todo title (max 60 characters). "
-            f"Just return the title, nothing else."
-        ))
-        title = Prompt.ask("📝 What should I call this task?", default=ai_suggestion.strip())
+        # Use AI to suggest a title only if we have valid API keys and execute_immediately is True
+        ai_suggestion = None
+        if execute_immediately and ai_router and hasattr(ai_router, 'models') and ai_router.models:
+            try:
+                ai_suggestion = asyncio.run(ai_router.route_and_process(
+                    f"Based on this request: '{user_input}', suggest a concise todo title (max 60 characters). "
+                    f"Just return the title, nothing else."
+                ))
+                ai_suggestion = ai_suggestion.strip()
+            except Exception:
+                # If AI fails, just use a simple fallback
+                ai_suggestion = None
+        
+        # Fallback to a simple title based on user input
+        if not ai_suggestion:
+            # Create a simple title from the first few words of user input
+            words = user_input.split()[:6]  # Take first 6 words
+            ai_suggestion = " ".join(words).capitalize()
+            if len(ai_suggestion) > 60:
+                ai_suggestion = ai_suggestion[:57] + "..."
+        
+        title = Prompt.ask("📝 What should I call this task?", default=ai_suggestion)
     
     # Validate title is not empty
     if not title.strip():
@@ -1845,44 +1861,28 @@ def handle_add_todo_natural(todo_manager, ai_router, image_handler, user_input, 
     todo_id = todo_manager.add_todo(title, description, todo_type, priority, content)
     console.print("✅ Perfect! I've added this to your task list.")
     
-    # Auto-suggest sub-task breakdown for complex todos
+    # Auto-suggest sub-task breakdown for complex todos (only if AI is available)
     todo = todo_manager.get_todo_by_id(todo_id)
-    if todo and todo_manager.is_todo_too_large(todo):
+    if (todo and todo_manager.is_todo_too_large(todo) and 
+        ai_router and hasattr(ai_router, 'models') and ai_router.models):
         console.print("🔍 You know what? This task looks pretty substantial!")
         if Confirm.ask("🎯 Want me to break it down into smaller, more manageable pieces?"):
-            sub_task_ids = todo_manager.create_sub_tasks_from_todo(todo_id, ai_router)
-            if sub_task_ids:
-                console.print(f"🎉 Great! I've created {len(sub_task_ids)} smaller tasks to help you tackle this step by step!")
-                console.print("💡 Just ask to 'show me my tasks' to see the breakdown.")
-                
-                # If this was set to execute immediately, ask about sub-tasks too
-                if execute_immediately:
-                    if Confirm.ask("🚀 Want me to start working on these sub-tasks right now?"):
-                        console.print("🔥 Awesome! Let me get started on these right away.")
-                        if multitasker:
-                            # Get the subtasks and process them
-                            sub_tasks = todo_manager.get_sub_tasks(todo_id)
-                            if sub_tasks:
-                                try:
-                                    asyncio.run(multitasker.start_multitask(sub_tasks))
-                                except Exception as e:
-                                    console.print(f"❌ Error processing sub-tasks: {e}")
-                                    console.print("💡 You can run them manually with 'multitask' command")
-                        else:
-                            console.print("⚠️ Multitasker not available. You can run the sub-tasks manually with 'multitask' command")
-                        return True
-                else:
-                    return False  # Don't execute immediately if subtasks created but execution not requested
-            else:
-                console.print("⚠️ Couldn't create sub-tasks, but I can still work on the original task if you want.")
-        else:
-            console.print("👍 No problem! I'll keep it as one large task.")
-    
-    # Handle immediate execution for non-subtask cases or when subtasks weren't created
-    if execute_immediately:
-        if multitasker and todo:
-            if Confirm.ask("🚀 Ready to start working on this task right now?"):
-                console.print("🔥 Let me get started on this right away.")
+            try:
+                sub_task_ids = todo_manager.create_sub_tasks_from_todo(todo_id, ai_router)
+                if sub_task_ids:
+                    console.print(f"🎉 Great! I've created {len(sub_task_ids)} smaller tasks to help you tackle this step by step!")
+                    console.print("💡 Just ask to 'show me my tasks' to see the breakdown.")
+                    
+                    # If this was set to execute immediately, ask about sub-tasks too
+                    if execute_immediately:
+                        if Confirm.ask("🚀 Want me to start working on these sub-tasks right now?"):
+                            # Process sub-tasks
+                            pending_subtasks = [todo_manager.get_todo_by_id(sid) for sid in sub_task_ids]
+                            if pending_subtasks and multitasker:
+                                asyncio.run(multitasker.start_multitask(pending_subtasks))
+            except Exception as e:
+                console.print(f"⚠️ Couldn't create sub-tasks automatically: {str(e)}")
+                console.print("💡 You can manually break this down later if needed.")
                 try:
                     asyncio.run(multitasker.start_multitask([todo]))
                 except Exception as e:
@@ -1968,21 +1968,33 @@ def handle_chat_natural(ai_router, image_handler, user_input):
     """Handle natural chat - enhanced with developer context"""
     console.print("💬 Let me help you with that...")
     
-    # Clean up old temporary files
-    image_handler.cleanup_old_temp_files()
+    # Check if AI models are available
+    if not ai_router or not hasattr(ai_router, 'models') or not ai_router.models:
+        console.print("❌ I'd love to help, but AI models aren't available right now.")
+        console.print("💡 Please run '2do setup' to configure AI model API keys.")
+        console.print("📝 In the meantime, you can:")
+        console.print("   • Add todos manually with 'add todo'")
+        console.print("   • List your current tasks with 'list todos'")
+        console.print("   • Manage your project setup with '2do verify'")
+        return
+    
+    # Clean up old temporary files  
+    if image_handler:
+        image_handler.cleanup_old_temp_files()
     
     # Check for clipboard image
     clipboard_image_path = None
-    try:
-        image = image_handler.check_clipboard_for_image()
-        if image is not None:
-            console.print("🖼️  I see you have an image in your clipboard!")
-            if Confirm.ask("Should I include this image in my analysis?"):
-                image_handler.display_image_info(image)
-                clipboard_image_path = image_handler.save_image_temporarily(image)
-                console.print(f"✅ Image attached to your question")
-    except Exception:
-        pass  # Silently ignore clipboard errors
+    if image_handler:
+        try:
+            image = image_handler.check_clipboard_for_image()
+            if image is not None:
+                console.print("🖼️  I see you have an image in your clipboard!")
+                if Confirm.ask("Should I include this image in my analysis?"):
+                    image_handler.display_image_info(image)
+                    clipboard_image_path = image_handler.save_image_temporarily(image)
+                    console.print(f"✅ Image attached to your question")
+        except Exception:
+            pass  # Silently ignore clipboard errors
     
     # Enhance the prompt with developer context
     enhanced_prompt = f"""As a developer-focused AI assistant, please help with this request: {user_input}
@@ -1998,20 +2010,25 @@ If this is a technical question, provide clear explanations with code examples w
     # Check if streaming is enabled (default to True for better UX)
     use_streaming = True  # Could be made configurable later
     
-    if use_streaming:
-        console.print("🤖 ", end="")
-        async def stream_chat_response():
-            full_response = ""
-            async for chunk in ai_router.route_and_process_stream(enhanced_prompt):
-                console.print(chunk, end="", flush=True)
-                full_response += chunk
-            return full_response
-        
-        response = asyncio.run(stream_chat_response())
-        console.print("\n")  # New line after streaming
-    else:
-        response = asyncio.run(ai_router.route_and_process(enhanced_prompt))
-        console.print(f"\n🤖 {response}\n")
+    try:
+        if use_streaming:
+            console.print("🤖 ", end="")
+            async def stream_chat_response():
+                full_response = ""
+                async for chunk in ai_router.route_and_process_stream(enhanced_prompt):
+                    console.print(chunk, end="")
+                    full_response += chunk
+                return full_response
+            
+            response = asyncio.run(stream_chat_response())
+            console.print("\n")  # New line after streaming
+        else:
+            response = asyncio.run(ai_router.route_and_process(enhanced_prompt))
+            console.print(f"\n🤖 {response}\n")
+    except Exception as e:
+        console.print(f"\n❌ Sorry, I encountered an issue: {e}")
+        console.print("💡 You might need to check your API keys with '2do setup'")
+        return
     
     # Offer follow-up suggestions
     console.print("💡 Want to do something with this information? Try:")
@@ -3591,84 +3608,6 @@ def agent_daemon(name, stop, status):
                 
     except Exception as e:
         console.print(f"❌ Error with background agent service: {e}")
-
-
-@cli.command()
-@click.option('--register', '-r', is_flag=True, help='Register this agent in the network')
-@click.option('--name', '-n', help='Optional agent name (default: Agent-{repo_name})')
-def agent_status(register, name):
-    """Show agent network status and discover other online agents"""
-    from .agent_registry import AgentRegistry
-    from .agent_communicator import AgentCommunicator
-    
-    console.print(Panel.fit("🤖 Agent Network Status", style="bold cyan"))
-    
-    try:
-        working_dir = _get_safe_working_directory()
-        config_manager = ConfigManager(working_dir)
-        agent_registry = AgentRegistry(config_manager)
-        
-        if register:
-            # Register this agent
-            agent_info = agent_registry.register_agent(name)
-            console.print(f"✅ Agent registered: {agent_info.agent_name}")
-            console.print(f"📍 Repository: {agent_info.repo_name}")
-            console.print(f"🛠️  Tech Stack: {', '.join(agent_info.tech_stack)}")
-            console.print(f"💼 Capabilities: {', '.join(agent_info.capabilities)}")
-            console.print()
-        
-        # Show online agents
-        online_agents = agent_registry.get_online_agents()
-        
-        if not online_agents:
-            console.print("🔍 No other agents currently online")
-            console.print("💡 Run '2do agent-status --register' in other repositories to discover agents")
-            return
-        
-        console.print(f"🌐 Found {len(online_agents)} online agent(s):")
-        
-        # Create table of agents
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("Agent", style="cyan", width=20)
-        table.add_column("Repository", style="green", width=25)
-        table.add_column("Tech Stack", style="yellow", width=30)
-        table.add_column("Status", style="blue", width=10)
-        table.add_column("Last Seen", style="dim", width=15)
-        
-        for agent in online_agents:
-            tech_stack_str = ", ".join(agent.tech_stack[:3])  # Show first 3 technologies
-            if len(agent.tech_stack) > 3:
-                tech_stack_str += "..."
-            
-            # Calculate time since last heartbeat
-            import time
-            time_diff = int(time.time() - agent.last_heartbeat)
-            if time_diff < 60:
-                last_seen = f"{time_diff}s ago"
-            elif time_diff < 3600:
-                last_seen = f"{time_diff // 60}m ago"
-            else:
-                last_seen = f"{time_diff // 3600}h ago"
-            
-            table.add_row(
-                agent.agent_name or f"Agent-{agent.repo_name}",
-                agent.repo_name,
-                tech_stack_str,
-                agent.status,
-                last_seen
-            )
-        
-        console.print(table)
-        
-        # Show collaboration opportunities
-        if online_agents:
-            console.print("\n🤝 Collaboration Commands:")
-            console.print("  • [bold]2do agent-help[/bold] - Request help from other agents")
-            console.print("  • [bold]2do agent-collaborate[/bold] - Start collaboration session")
-            console.print("  • [bold]2do agent-messages[/bold] - Check messages from other agents")
-            
-    except Exception as e:
-        console.print(f"❌ Error accessing agent network: {e}")
 
 
 @cli.command()

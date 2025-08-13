@@ -1,62 +1,28 @@
 {
   "sessions": [
     {
-      "session_id": "session_1754657486",
+      "session_id": "session_1755117056",
       "allowed_paths": [
         "/home/runner/work/2do-developer/2do-developer"
-      ],
-      "allowed_patterns": [],
-      "read_permissions": [
-        "/home/runner/work/2do-developer/2do-developer"
-      ],
-      "write_permissions": [
-        "/home/runner/work/2do-developer/2do-developer"
-      ],
-      "execute_permissions": [],
-      "created_at": 1754657486.906098,
-      "last_used": 1754657486.90615
-    },
-    {
-      "session_id": "test_session",
-      "allowed_paths": [
-        "/home/runner/work/2do-developer/2do-developer"
-      ],
-      "allowed_patterns": [],
-      "read_permissions": [
-        "/home/runner/work/2do-developer/2do-developer"
-      ],
-      "write_permissions": [
-        "/home/runner/work/2do-developer/2do-developer"
-      ],
-      "execute_permissions": [],
-      "created_at": 1754657561.090044,
-      "last_used": 1754657561.09076
-    },
-    {
-      "session_id": "session_1754657705",
-      "allowed_paths": [
-        "/home/runner/work/2do-developer/2do-developer/test_file.txt",
-        "/Users/andreaskviby/Herd/2do-developer"
       ],
       "allowed_patterns": [
-        "/Users/andreaskviby/Herd/2do-developer/**/*",
-        "/Users/andreaskviby/Herd/2do-developer/.*"
+        "/home/runner/work/2do-developer/2do-developer/**/*",
+        "/home/runner/work/2do-developer/2do-developer/.*"
       ],
       "read_permissions": [
-        "/Users/andreaskviby/Herd/2do-developer/**/*",
-        "/home/runner/work/2do-developer/2do-developer/test_file.txt",
-        "/Users/andreaskviby/Herd/2do-developer/.*",
-        "/Users/andreaskviby/Herd/2do-developer"
+        "/home/runner/work/2do-developer/2do-developer/**/*",
+        "/home/runner/work/2do-developer/2do-developer",
+        "/home/runner/work/2do-developer/2do-developer/.*"
       ],
       "write_permissions": [
-        "/Users/andreaskviby/Herd/2do-developer/**/*",
-        "/Users/andreaskviby/Herd/2do-developer/.*",
-        "/Users/andreaskviby/Herd/2do-developer"
+        "/home/runner/work/2do-developer/2do-developer/**/*",
+        "/home/runner/work/2do-developer/2do-developer",
+        "/home/runner/work/2do-developer/2do-developer/.*"
       ],
       "execute_permissions": [],
-      "created_at": 1754657705.1535287,
-      "last_used": 1754763641.4881642
+      "created_at": 1755117056.6292605,
+      "last_used": 1755117056.629368
     }
   ],
-  "last_cleanup": 1754763641.4883
+  "last_cleanup": 1755117056.6294863
 }

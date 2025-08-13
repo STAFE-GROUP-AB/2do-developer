@@ -1,44 +1,23 @@
 analysis:
   analysis_completed: true
-  last_analyzed: '2025-08-04T19:33:39.516459'
-  memory_files_created: true
+  last_analyzed: '2025-08-13T20:30:58.351265'
+  memory_files_created: false
   tech_stack:
   - git
   - kubernetes
   - python
 api_keys:
-  anthropic: your_anthropic_api_key_here
-  github: your_github_token_here
-  openai: your_openai_api_key_here
+  openai: sk-invalid
 mcp_servers:
-- category: essential
-  command: uvx context7
-  description: Advanced context management and memory for AI applications
+- args:
+  - -y
+  - '@modelcontextprotocol/server-filesystem'
+  command: npx
   enabled: true
-  name: Context7 (Upstash)
-  repository: https://github.com/upstash/context7
-- category: essential
-  command: npx -y @modelcontextprotocol/server-filesystem
-  description: Official MCP filesystem server with advanced file operations, pattern
-    matching, and security controls
-  enabled: true
-  name: Official Filesystem MCP Server
-  repository: https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem
-- category: development
-  command: uvx mcp-server-git
-  description: Git repository operations and version control
-  enabled: true
-  name: Git MCP Server
-  repository: https://github.com/modelcontextprotocol/servers/tree/main/src/git
-- category: development
-  command: uvx mcp-server-github
-  description: GitHub API integration for issues, PRs, and repositories
-  enabled: true
-  name: GitHub MCP Server
-  repository: https://github.com/modelcontextprotocol/servers/tree/main/src/github
+  name: filesystem
+  type: official
+mcp_tokens: {}
 preferences:
   default_model: auto
-  enable_local_models: true
   max_parallel_tasks: 5
   memory_enabled: true
-  show_all_local_models: true
