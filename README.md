@@ -233,6 +233,144 @@ Our intelligent scoring system gives massive bonuses to Claude models:
 - **MCP server integration**: Intelligent server recommendations and management based on tech stack analysis
 - **Auto-update system**: Built-in update mechanism with multiple installation method support
 
+## 📚 Command Reference
+
+### 🤖 Claude Code Engine Commands
+
+#### `2do claude-code [prompt]`
+**Primary Claude-powered development assistant**
+```bash
+# Interactive mode for persistent Claude sessions
+2do claude-code --interactive
+
+# Direct prompt with Claude optimization
+2do claude-code "Refactor this component using React hooks"
+
+# Enable Claude-first mode
+2do claude-code --prefer-claude "Build a REST API"
+```
+
+#### `2do tall-stack [prompt]`
+**Laravel + Livewire + Alpine.js + TailwindCSS specialization**
+```bash
+# Generate complete TALL stack features
+2do tall-stack "Build user authentication with email verification"
+
+# Create Livewire components
+2do tall-stack --component UserDashboard --scaffold
+
+# Generate models with Laravel conventions
+2do tall-stack --model Product --route "CRUD operations"
+```
+
+#### `2do flutter-dev [prompt]`
+**Flutter & Dart development assistant**
+```bash
+# Build Flutter features with Material Design 3
+2do flutter-dev "Create a shopping cart with animations"
+
+# Generate responsive widgets
+2do flutter-dev --widget PaymentCard --responsive
+
+# Build screens with state management
+2do flutter-dev --screen ProfilePage --state bloc
+```
+
+#### `2do claude-status`
+**Monitor Claude engine configuration and model availability**
+```bash
+# Check Claude models and configuration
+2do claude-status
+
+# Shows:
+# - Available Claude models and capabilities
+# - Claude-first mode status
+# - Framework-specific optimizations
+# - Quick setup recommendations
+```
+
+### 🔧 Core Commands
+
+#### `2do start [--repo URL]`
+**Initialize 2DO session**
+```bash
+# Start in current directory
+2do start
+
+# Analyze GitHub repository
+2do start --repo https://github.com/user/project
+```
+
+#### `2do setup`
+**Configure API keys and preferences**
+```bash
+# Interactive setup wizard
+2do setup
+```
+
+#### `2do update [--check-only] [--force]`
+**Update 2DO to latest version**
+```bash
+# Check for updates
+2do update --check-only
+
+# Update to latest version
+2do update
+
+# Force update from main branch
+2do update --force
+```
+
+### 📋 Todo Management Commands
+
+#### `2do add [--type TYPE] [--priority PRIORITY]`
+**Add new todos**
+```bash
+# Interactive todo creation
+2do add
+
+# Quick todo with type and priority
+2do add --type code --priority high "Fix authentication bug"
+```
+
+#### `2do list [--filter FILTER]`
+**List todos with filtering**
+```bash
+# List all todos
+2do list
+
+# Filter by priority or type
+2do list --filter high
+2do list --filter code
+```
+
+### 🌐 Integration Commands
+
+#### `2do mcp [--recommend] [--list]`
+**MCP server management**
+```bash
+# Get server recommendations
+2do mcp --recommend
+
+# List configured servers
+2do mcp --list
+
+# Interactive server setup
+2do mcp
+```
+
+#### `2do github-issues`
+**GitHub integration workflow**
+```bash
+# Access GitHub issues menu
+2do github-issues
+
+# Available options:
+# - list: View open issues
+# - work-on: Create branch for issue
+# - finish-work: Create pull request
+```
+
 ## 🏗️ Repository Architecture
 
 ### Technical Overview
@@ -647,12 +785,58 @@ cd /path/to/your/web/project
 # 3. 2DO will choose the best model for image analysis
 ```
 
+### Claude Code Engine Usage
+```bash
+# Start interactive Claude coding session
+2do claude-code --interactive
+
+# Enable Claude-first mode for current project  
+2do claude-code "Refactor my authentication system using Laravel best practices"
+
+# Check Claude engine status and configuration
+2do claude-status
+
+# The Claude Code Engine will:
+# 1. Automatically detect your project framework
+# 2. Apply Claude-specific optimizations for coding tasks
+# 3. Provide framework-specific best practices and patterns
+# 4. Route all coding tasks through Claude models preferentially
+```
+
 ### TALL Stack Development
 ```bash
-# When working in a Laravel project with TailwindCSS, Alpine.js, and Livewire:
-# 1. 2DO detects all TALL stack components
-# 2. Creates specialized memory files with best practices
-# 3. Provides contextual advice for the full stack
+# Use the specialized TALL stack command for Laravel projects
+2do tall-stack "Build a user dashboard with real-time notifications"
+
+# Create Livewire component with Alpine.js integration
+2do tall-stack --component UserProfile --scaffold
+
+# Generate Eloquent model with full Laravel setup
+2do tall-stack --model BlogPost --route "CRUD operations with validation"
+
+# TALL Stack mode automatically:
+# 1. Detects Laravel + Livewire + Alpine.js + TailwindCSS
+# 2. Applies TALL stack best practices and conventions
+# 3. Uses Claude models optimized for PHP/Laravel development
+# 4. Provides Livewire 3.x and Alpine.js integration patterns
+```
+
+### Flutter Development
+```bash
+# Use the specialized Flutter development command
+2do flutter-dev "Create a shopping cart screen with state management"
+
+# Create Flutter widget with Material Design 3
+2do flutter-dev --widget CustomButton --responsive
+
+# Build complete screen with state management pattern
+2do flutter-dev --screen UserProfile --state riverpod
+
+# Flutter development mode:
+# 1. Applies Material Design 3 guidelines automatically
+# 2. Integrates state management patterns (BLoC, Provider, Riverpod)
+# 3. Ensures responsive design for mobile, tablet, desktop
+# 4. Uses Claude models optimized for Dart/Flutter development
 ```
 
 ### Adding Different Types of Todos
