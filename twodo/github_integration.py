@@ -25,7 +25,7 @@ class GitHubIntegration:
                 self.github.get_user().login
                 console.print("✅ GitHub connection established")
             except Exception as e:
-                console.print(f"❌ GitHub connection failed: {e}")
+                console.print(f"❌ GitHub connection failed: {type(e).__name__}")
                 self.github = None
         else:
             console.print("⚠️  No GitHub token provided. GitHub features will be limited.")
