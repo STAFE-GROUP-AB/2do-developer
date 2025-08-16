@@ -2736,6 +2736,11 @@ def todo_write(title, description, type, priority, content, from_file):
     console.print(Panel.fit("✍️ Todo Write Tool", style="bold green"))
     
     try:
+        # Validate title is not empty
+        if not title.strip():
+            console.print("❌ Todo title cannot be empty. Please provide a meaningful title.")
+            return
+        
         working_dir = _get_safe_working_directory()
         config_manager = ConfigManager(working_dir)
         todo_manager = TodoManager(config_manager.config_dir)

@@ -323,8 +323,46 @@ Our intelligent scoring system gives massive bonuses to Claude models:
 
 ### 📋 Todo Management Commands
 
-#### `2do add [--type TYPE] [--priority PRIORITY]`
-**Add new todos**
+#### `2do todo-read [OPTIONS]`
+**Read and display todos - like Claude Code todo read tool**
+```bash
+# List all todos in table format (default)
+2do todo-read
+
+# Show only pending todos
+2do todo-read --pending-only
+
+# Filter todos by status, priority, or type
+2do todo-read --filter critical
+2do todo-read --filter code
+
+# Different output formats
+2do todo-read --format list      # Simple list with emojis
+2do todo-read --format json      # JSON output for scripting
+2do todo-read --format table     # Rich table (default)
+```
+
+#### `2do todo-write TITLE [OPTIONS]`
+**Write/create a new todo - like Claude Code todo write tool**
+```bash
+# Quick todo creation
+2do todo-write "Fix authentication bug"
+
+# Todo with description and type
+2do todo-write "Fix login issue" -d "User login not working properly" -t code -p high
+
+# Add content inline
+2do todo-write "Review CSS" -c "body { background: red; }" -t code
+
+# Load content from file
+2do todo-write "Review function" -f /path/to/code.js -t code -p high
+
+# Available types: code, text, image, general
+# Available priorities: low, medium, high, critical
+```
+
+#### `2do add [--type TYPE] [--priority PRIORITY]` (Interactive)
+**Add new todos** 
 ```bash
 # Interactive todo creation
 2do add
@@ -333,7 +371,7 @@ Our intelligent scoring system gives massive bonuses to Claude models:
 2do add --type code --priority high "Fix authentication bug"
 ```
 
-#### `2do list [--filter FILTER]`
+#### `2do list [--filter FILTER]` (Interactive)
 **List todos with filtering**
 ```bash
 # List all todos
@@ -840,6 +878,27 @@ cd /path/to/your/web/project
 ```
 
 ### Adding Different Types of Todos
+
+#### Using CLI Commands (Claude Code Style)
+```bash
+# Quick todo creation with CLI (no interaction needed)
+2do todo-write "Fix authentication bug" -t code -p high
+
+# Add todo with description and content
+2do todo-write "Update API docs" -d "Update REST API documentation" -t text -p medium
+
+# Add todo with content from file  
+2do todo-write "Review security code" -f /path/to/security.js -t code -p critical
+
+# Read todos in different formats
+2do todo-read                    # Table format (default)
+2do todo-read --format list      # Simple list with emojis  
+2do todo-read --format json      # JSON for scripting
+2do todo-read --filter high      # Show only high priority
+2do todo-read --pending-only     # Show only pending todos
+```
+
+#### Using Interactive Mode
 ```bash
 # Code-related todo
 Todo type: code
