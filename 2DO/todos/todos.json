@@ -103,5 +103,20 @@
     "result": null,
     "parent_id": null,
     "sub_task_ids": []
+  },
+  {
+    "id": "207114f0",
+    "title": "Demo todo for screenshot",
+    "description": "This demonstrates the new CLI commands",
+    "todo_type": "code",
+    "priority": "medium",
+    "status": "pending",
+    "content": null,
+    "created_at": "2025-08-16T07:20:22.275494",
+    "updated_at": "2025-08-16T07:20:22.275494",
+    "assigned_model": null,
+    "result": null,
+    "parent_id": null,
+    "sub_task_ids": []
   }
 ]
