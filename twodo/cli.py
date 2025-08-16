@@ -2633,6 +2633,161 @@ def clear_cache():
         console.print(f"❌ Error clearing cache: {e}")
 
 
+@cli.command("todo-read")
+@click.option('--filter', '-f', help='Filter todos by status, priority, or type')
+@click.option('--format', '-fmt', default='table', type=click.Choice(['table', 'json', 'list']), help='Output format')
+@click.option('--pending-only', is_flag=True, help='Show only pending todos')
+def todo_read(filter, format, pending_only):
+    """Read and display todos - like Claude Code todo read tool"""
+    console.print(Panel.fit("📋 Todo Read Tool", style="bold blue"))
+    
+    try:
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        todo_manager = TodoManager(config_manager.config_dir)
+        
+        # Get todos based on filters
+        if pending_only:
+            todos = todo_manager.get_pending_todos()
+        else:
+            todos = todo_manager.get_todos()
+        
+        # Apply additional filters
+        if filter:
+            filter_lower = filter.lower()
+            todos = [todo for todo in todos if 
+                    filter_lower in todo.get("status", "").lower() or
+                    filter_lower in todo.get("priority", "").lower() or
+                    filter_lower in todo.get("todo_type", "").lower()]
+        
+        if not todos:
+            console.print("📝 No todos found matching the criteria")
+            return
+        
+        # Display todos in requested format
+        if format == 'json':
+            import json
+            console.print(json.dumps(todos, indent=2, default=str))
+        elif format == 'list':
+            for i, todo in enumerate(todos, 1):
+                status_emoji = "⏳" if todo.get("status") == "pending" else "✅" if todo.get("status") == "completed" else "🔄"
+                priority_emoji = "🔴" if todo.get("priority") == "critical" else "🟡" if todo.get("priority") == "high" else "🟢"
+                console.print(f"{i}. {status_emoji} {priority_emoji} {todo.get('title', 'Untitled')} ({todo.get('id', 'no-id')[:8]})")
+        else:  # table format (default)
+            table = Table(title="📋 Todos")
+            table.add_column("ID", style="cyan", width=8)
+            table.add_column("Title", style="bold")
+            table.add_column("Type", style="magenta", width=8)
+            table.add_column("Priority", style="yellow", width=8)
+            table.add_column("Status", style="green", width=12)
+            table.add_column("Created", style="dim", width=10)
+            
+            # Sort by priority and creation date
+            priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+            sorted_todos = sorted(todos, key=lambda x: (
+                priority_order.get(x.get("priority", "medium"), 2),
+                x.get("created_at", "")
+            ))
+            
+            for todo in sorted_todos:
+                status = todo.get("status", "pending")
+                status_display = {
+                    "pending": "⏳ Pending",
+                    "in_progress": "🔄 In Progress", 
+                    "completed": "✅ Completed",
+                    "failed": "❌ Failed"
+                }.get(status, status)
+                
+                created_date = todo.get("created_at", "")
+                if created_date:
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(created_date.replace('Z', '+00:00'))
+                        created_display = dt.strftime("%m/%d")
+                    except:
+                        created_display = created_date[:10] if len(created_date) >= 10 else created_date
+                else:
+                    created_display = "Unknown"
+                
+                table.add_row(
+                    todo.get("id", "")[:8],
+                    todo.get("title", "Untitled"),
+                    todo.get("todo_type", "general"),
+                    todo.get("priority", "medium"),
+                    status_display,
+                    created_display
+                )
+            
+            console.print(table)
+            
+    except Exception as e:
+        console.print(f"❌ Error reading todos: {e}")
+
+
+@cli.command("todo-write")
+@click.argument('title')
+@click.option('--description', '-d', default='', help='Todo description')
+@click.option('--type', '-t', default='general', type=click.Choice(['code', 'text', 'image', 'general']), help='Todo type')
+@click.option('--priority', '-p', default='medium', type=click.Choice(['low', 'medium', 'high', 'critical']), help='Todo priority')
+@click.option('--content', '-c', help='Todo content (code, text, or file path)')
+@click.option('--from-file', '-f', help='Read content from file')
+def todo_write(title, description, type, priority, content, from_file):
+    """Write/create a new todo - like Claude Code todo write tool"""
+    console.print(Panel.fit("✍️ Todo Write Tool", style="bold green"))
+    
+    try:
+        # Validate title is not empty
+        if not title.strip():
+            console.print("❌ Todo title cannot be empty. Please provide a meaningful title.")
+            return
+        
+        working_dir = _get_safe_working_directory()
+        config_manager = ConfigManager(working_dir)
+        todo_manager = TodoManager(config_manager.config_dir)
+        
+        # Handle content from file if specified
+        final_content = content
+        if from_file:
+            try:
+                with open(from_file, 'r', encoding='utf-8') as f:
+                    final_content = f.read()
+                console.print(f"📄 Content loaded from {from_file}")
+            except Exception as e:
+                console.print(f"❌ Error reading file {from_file}: {e}")
+                return
+        
+        # Create the todo
+        todo_id = todo_manager.add_todo(
+            title=title,
+            description=description,
+            todo_type=type,
+            priority=priority,
+            content=final_content
+        )
+        
+        console.print(f"✅ Todo created successfully!")
+        console.print(f"📝 ID: {todo_id}")
+        console.print(f"📋 Title: {title}")
+        console.print(f"🏷️ Type: {type}")
+        console.print(f"⚡ Priority: {priority}")
+        
+        if description:
+            console.print(f"📄 Description: {description}")
+        
+        if final_content:
+            content_preview = final_content[:100] + "..." if len(final_content) > 100 else final_content
+            console.print(f"📎 Content: {content_preview}")
+        
+        # Check if todo should be broken down into sub-tasks  
+        todo = todo_manager.get_todo_by_id(todo_id)
+        if todo and todo_manager.is_todo_too_large(todo):
+            console.print("\n🔍 This todo appears to be quite large and complex.")
+            console.print("💡 Consider breaking it down with: 2do start -> 'create-subtasks'")
+            
+    except Exception as e:
+        console.print(f"❌ Error creating todo: {e}")
+
+
 @cli.command()
 def automation_status():
     """Show current automation engine status and features"""

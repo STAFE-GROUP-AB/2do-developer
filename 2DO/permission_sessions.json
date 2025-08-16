@@ -6,23 +6,23 @@
         "/home/runner/work/2do-developer/2do-developer"
       ],
       "allowed_patterns": [
-        "/home/runner/work/2do-developer/2do-developer/**/*",
-        "/home/runner/work/2do-developer/2do-developer/.*"
+        "/home/runner/work/2do-developer/2do-developer/.*",
+        "/home/runner/work/2do-developer/2do-developer/**/*"
       ],
       "read_permissions": [
+        "/home/runner/work/2do-developer/2do-developer/.*",
         "/home/runner/work/2do-developer/2do-developer/**/*",
-        "/home/runner/work/2do-developer/2do-developer",
-        "/home/runner/work/2do-developer/2do-developer/.*"
+        "/home/runner/work/2do-developer/2do-developer"
       ],
       "write_permissions": [
+        "/home/runner/work/2do-developer/2do-developer/.*",
         "/home/runner/work/2do-developer/2do-developer/**/*",
-        "/home/runner/work/2do-developer/2do-developer",
-        "/home/runner/work/2do-developer/2do-developer/.*"
+        "/home/runner/work/2do-developer/2do-developer"
       ],
       "execute_permissions": [],
       "created_at": 1755117056.6292605,
-      "last_used": 1755117056.629368
+      "last_used": 1755328508.5769858
     }
   ],
-  "last_cleanup": 1755117056.6294863
+  "last_cleanup": 1755328508.5770752
 }
