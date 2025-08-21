@@ -139,6 +139,9 @@ cd /your/project
 
 # Check Claude model status and configuration
 2do claude-status
+
+# Enhanced Laravel analysis (auto-installs Laravel DevToolbox)
+2do laravel-analyze --install
 ```
 
 ## 🔥 Claude Code Engine - The Ultimate Claude Addon
@@ -170,6 +173,33 @@ cd /your/project
 - **Model availability**: Check all configured Claude models and their capabilities
 - **Configuration status**: View Claude-first mode and specialization settings
 - **Quick setup**: Recommendations for optimal Claude configuration
+
+#### **Laravel DevToolbox Integration** - Enhanced Laravel Analysis
+- **Deep analysis**: Comprehensive Laravel application scanning and inspection
+- **Model relationships**: Generate model relationship diagrams and analyze usage patterns
+- **Route optimization**: Detect unused routes and analyze route performance
+- **Security scanning**: Identify unprotected routes and potential security issues
+- **SQL analysis**: Trace queries, detect N+1 problems, and optimize database interactions
+- **Export capabilities**: JSON reports, Mermaid diagrams, and markdown documentation
+
+**Laravel DevToolbox Commands:**
+```bash
+# Install Laravel DevToolbox for enhanced analysis
+2do laravel-install-devtoolbox
+
+# Comprehensive Laravel application analysis
+2do laravel-analyze --report analysis.json
+
+# Focus on specific areas
+2do laravel-analyze --models --format json
+2do laravel-analyze --routes --security
+
+# Generate model relationship diagrams
+2do laravel-models --graph --output models.mmd
+
+# Find unused routes and optimization opportunities
+2do laravel-routes --unused
+```
 
 ### 🧠 **Claude Model Prioritization**
 
@@ -857,6 +887,41 @@ cd /path/to/your/web/project
 # 2. Applies TALL stack best practices and conventions
 # 3. Uses Claude models optimized for PHP/Laravel development
 # 4. Provides Livewire 3.x and Alpine.js integration patterns
+```
+
+### Laravel Deep Analysis with DevToolbox
+```bash
+# Install Laravel DevToolbox for enhanced Laravel analysis
+2do laravel-install-devtoolbox
+
+# Comprehensive Laravel application analysis
+2do laravel-analyze
+# The tool will:
+# 1. Detect Laravel project structure
+# 2. Install Laravel DevToolbox if needed
+# 3. Run deep analysis of models, routes, and security
+# 4. Provide optimization recommendations
+
+# Focus on specific analysis areas
+2do laravel-analyze --models --format json
+2do laravel-analyze --routes --security
+2do laravel-analyze --report detailed-analysis.json
+
+# Generate model relationship diagrams
+2do laravel-models --graph --output models.mmd
+# Creates Mermaid diagram showing all model relationships
+
+# Find unused routes and optimization opportunities
+2do laravel-routes --unused
+2do laravel-routes --where UserController
+
+# The Laravel DevToolbox integration provides:
+# 1. Deep application scanning and model analysis
+# 2. Route usage tracking and unused route detection
+# 3. Security scanning for unprotected endpoints
+# 4. SQL query analysis and N+1 problem detection
+# 5. Model relationship mapping and visualization
+# 6. Export capabilities for documentation and CI/CD
 ```
 
 ### Flutter Development

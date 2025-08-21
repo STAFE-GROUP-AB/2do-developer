@@ -391,7 +391,15 @@ class TechStackDetector:
                 "common_libraries": ["eloquent", "blade", "artisan", "tinker"],
                 "file_extensions": [".php"],
                 "testing_frameworks": ["phpunit", "pest"],
-                "package_managers": ["composer"]
+                "package_managers": ["composer"],
+                "enhancement_tools": ["laravel-devtoolbox for deep analysis", "2do laravel-analyze command"],
+                "analysis_capabilities": [
+                    "Model relationship mapping",
+                    "Route usage analysis",
+                    "Security scanning",
+                    "SQL query optimization",
+                    "Component architecture insights"
+                ]
             },
             "livewire": {
                 "description": "Laravel framework for building dynamic interfaces",
@@ -472,6 +480,9 @@ class TechStackDetector:
             
         if "tailwindcss" in tech_stack and "alpinejs" in tech_stack:
             notes.append("TailwindCSS + Alpine.js: Excellent combination for utility-first styling with lightweight interactions")
+        
+        if "laravel" in tech_stack:
+            notes.append("Laravel detected: Consider using '2do laravel-analyze' for deep application analysis")
         
         if len(detected_tall) == 4:
             notes.append("Complete TALL Stack detected - modern full-stack development with minimal JavaScript complexity")
