@@ -6,6 +6,7 @@ Basic tests for 2DO functionality
 import unittest
 import tempfile
 import os
+import json
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -336,6 +337,47 @@ class Test2DO(unittest.TestCase):
         # Clean up
         if os.path.exists(temp_path):
             os.unlink(temp_path)
+    
+    def test_laravel_devtoolbox_integration(self):
+        """Test Laravel DevToolbox integration functionality"""
+        from twodo.laravel_devtoolbox_integration import LaravelDevToolboxIntegration
+        
+        # Test with a temporary Laravel-like project
+        test_repo = Path(self.temp_dir) / "laravel_project"
+        test_repo.mkdir()
+        
+        # Create basic Laravel files
+        composer_json = test_repo / "composer.json"
+        composer_json.write_text(json.dumps({
+            "require": {
+                "laravel/framework": "^11.0"
+            },
+            "require-dev": {}
+        }))
+        
+        artisan = test_repo / "artisan"
+        artisan.write_text("#!/usr/bin/env php\n<?php // Laravel Artisan")
+        
+        # Test Laravel project detection
+        integration = LaravelDevToolboxIntegration(str(test_repo))
+        self.assertTrue(integration.is_laravel_project())
+        
+        # Test DevToolbox installation detection (should be false initially)
+        self.assertFalse(integration.is_devtoolbox_installed())
+        
+        # Test getting analysis summary without DevToolbox
+        summary = integration.get_analysis_summary()
+        self.assertEqual(summary.get("error"), "Laravel DevToolbox not installed")
+        
+        # Test with non-Laravel project
+        non_laravel = Path(self.temp_dir) / "non_laravel"
+        non_laravel.mkdir()
+        
+        integration_non_laravel = LaravelDevToolboxIntegration(str(non_laravel))
+        self.assertFalse(integration_non_laravel.is_laravel_project())
+        
+        summary_non_laravel = integration_non_laravel.get_analysis_summary()
+        self.assertEqual(summary_non_laravel["error"], "Not a Laravel project")
 
 if __name__ == '__main__':
     unittest.main()

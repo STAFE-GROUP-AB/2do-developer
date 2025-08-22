@@ -38,6 +38,7 @@ from .intent_router import IntentRouter
 from .permission_manager import PermissionManager, diagnose_permissions, get_session_permission_manager
 from .enhanced_file_handler import get_enhanced_file_handler
 from .automation_engine import AutomationEngine
+from .laravel_devtoolbox_integration import LaravelDevToolboxIntegration
 
 from .setup_guide import SetupGuide
 from .mcp_manager import MCPServerManager
@@ -4264,6 +4265,22 @@ def tall_stack(task, component, model, route, scaffold):
         working_dir = _get_safe_working_directory()
         config_manager = ConfigManager(working_dir)
         
+        # Check for Laravel DevToolbox integration
+        devtoolbox = LaravelDevToolboxIntegration(working_dir)
+        if devtoolbox.is_laravel_project():
+            if not devtoolbox.is_devtoolbox_installed():
+                console.print("💡 [yellow]Enhanced Laravel analysis available![/yellow]")
+                if Confirm.ask("Install Laravel DevToolbox for deeper project insights?", default=False):
+                    devtoolbox.install_devtoolbox()
+            
+            # Add Laravel project context if DevToolbox is available
+            if devtoolbox.is_devtoolbox_installed():
+                console.print("📊 Adding Laravel project context...")
+                analysis_summary = devtoolbox.get_analysis_summary()
+                if analysis_summary.get("quick_analysis"):
+                    console.print(f"  📋 Project has {analysis_summary['quick_analysis'].get('models_count', {}).get('count', 'unknown')} models")
+                    console.print(f"  🛣️ Project has {analysis_summary['quick_analysis'].get('routes_count', {}).get('count', 'unknown')} routes")
+        
         # Enable Claude-first mode for TALL stack
         config_manager.set_preference("claude_first_mode", True)
         config_manager.set_preference("claude_code_specialization", "tall-stack")
@@ -4446,9 +4463,233 @@ def claude_status():
             console.print("   • Run [bold]2do claude-code --interactive[/bold] to enable Claude-first mode")
             console.print("   • Use [bold]2do tall-stack[/bold] for Laravel/Livewire projects")
             console.print("   • Use [bold]2do flutter-dev[/bold] for Flutter development")
+            console.print("   • Use [bold]2do laravel-analyze[/bold] for deep Laravel analysis")
         
     except Exception as e:
         console.print(f"❌ Error checking Claude status: {e}")
+
+
+@cli.command("laravel-analyze")
+@click.option('--install', is_flag=True, help='Install Laravel DevToolbox if not present')
+@click.option('--report', help='Save analysis report to file')
+@click.option('--models', is_flag=True, help='Focus on model analysis')
+@click.option('--routes', is_flag=True, help='Focus on route analysis')
+@click.option('--security', is_flag=True, help='Focus on security analysis')
+@click.option('--format', default='table', type=click.Choice(['table', 'json']), help='Output format')
+def laravel_analyze(install, report, models, routes, security, format):
+    """
+    Deep Laravel application analysis using Laravel DevToolbox.
+    
+    This command provides comprehensive analysis of Laravel applications including:
+    - Model relationships and usage patterns
+    - Route analysis and unused route detection
+    - Security scanning for unprotected routes
+    - SQL query analysis and N+1 detection
+    
+    Examples:
+        2do laravel-analyze
+        2do laravel-analyze --models --format json
+        2do laravel-analyze --report analysis.json
+        2do laravel-analyze --security --routes
+    """
+    console.print("🔍 [bold blue]Laravel Deep Analysis[/bold blue]")
+    
+    devtoolbox = LaravelDevToolboxIntegration()
+    
+    # Check if this is a Laravel project
+    if not devtoolbox.is_laravel_project():
+        console.print("❌ This doesn't appear to be a Laravel project.")
+        console.print("   Looking for: artisan file and laravel/framework in composer.json")
+        return
+    
+    # Check if DevToolbox is installed or install it
+    if not devtoolbox.is_devtoolbox_installed():
+        if install or devtoolbox.prompt_for_installation():
+            if not devtoolbox.install_devtoolbox():
+                return
+        else:
+            console.print("💡 Use --install flag to automatically install Laravel DevToolbox")
+            return
+    
+    # Run specific analysis based on flags
+    if models:
+        console.print("\n📊 [bold]Model Analysis[/bold]")
+        result = devtoolbox.analyze_models()
+        if result and format == 'json':
+            console.print(json.dumps(result, indent=2))
+        elif result:
+            console.print(result.get('raw_output', 'No output'))
+    
+    elif routes:
+        console.print("\n🛣️ [bold]Route Analysis[/bold]")
+        # Get all routes
+        routes_result = devtoolbox.run_devtoolbox_command('dev:routes', [], format)
+        if routes_result and format == 'json':
+            console.print(json.dumps(routes_result, indent=2))
+        elif routes_result:
+            console.print(routes_result.get('raw_output', 'No output'))
+        
+        # Check for unused routes
+        console.print("\n🔍 [bold]Unused Routes[/bold]")
+        unused_routes = devtoolbox.find_unused_routes()
+        if unused_routes:
+            if format == 'json':
+                console.print(json.dumps(unused_routes, indent=2))
+            else:
+                for route in unused_routes:
+                    console.print(f"  ⚠️ {route}")
+    
+    elif security:
+        console.print("\n🔒 [bold]Security Analysis[/bold]")
+        result = devtoolbox.check_security_issues()
+        if result and format == 'json':
+            console.print(json.dumps(result, indent=2))
+        elif result:
+            console.print(result.get('raw_output', 'No output'))
+    
+    else:
+        # Comprehensive analysis
+        console.print("\n📋 Running comprehensive Laravel analysis...")
+        
+        if report:
+            analysis_report = devtoolbox.create_analysis_report(report)
+            console.print(f"✅ Comprehensive analysis report saved to: {report}")
+        else:
+            analysis_result = devtoolbox.analyze_application()
+            if analysis_result and format == 'json':
+                console.print(json.dumps(analysis_result, indent=2))
+            elif analysis_result:
+                for command, result in analysis_result.items():
+                    console.print(f"\n📊 [bold]{command.replace('_', ' ').title()}[/bold]")
+                    console.print(result.get('raw_output', 'No output'))
+    
+    console.print("\n💡 [bold yellow]Tips:[/bold yellow]")
+    console.print("   • Use --models for detailed model relationship analysis")
+    console.print("   • Use --routes to find unused routes and optimize")
+    console.print("   • Use --security to identify potential security issues")
+    console.print("   • Use --report filename.json to save detailed analysis")
+
+
+@cli.command("laravel-models")
+@click.option('--graph', is_flag=True, help='Generate model relationship graph')
+@click.option('--output', help='Output file for graph (requires --graph)')
+@click.option('--format', default='mermaid', type=click.Choice(['mermaid', 'json']), help='Graph format')
+def laravel_models(graph, output, format):
+    """
+    Analyze Laravel models and relationships.
+    
+    Examples:
+        2do laravel-models
+        2do laravel-models --graph --output models.mmd
+        2do laravel-models --graph --format json
+    """
+    console.print("📊 [bold blue]Laravel Models Analysis[/bold blue]")
+    
+    devtoolbox = LaravelDevToolboxIntegration()
+    
+    if not devtoolbox.is_laravel_project():
+        console.print("❌ This doesn't appear to be a Laravel project.")
+        return
+    
+    if not devtoolbox.is_devtoolbox_installed():
+        if devtoolbox.prompt_for_installation():
+            if not devtoolbox.install_devtoolbox():
+                return
+        else:
+            return
+    
+    if graph:
+        # Generate model relationship graph
+        output_file = output or f"laravel-models-{int(time.time())}.{format}"
+        if devtoolbox.generate_model_graph(output_file, format):
+            console.print(f"✅ Model relationship graph generated: {output_file}")
+    else:
+        # Regular model analysis
+        result = devtoolbox.analyze_models()
+        if result:
+            console.print(result.get('raw_output', 'No models found'))
+
+
+@cli.command("laravel-routes")
+@click.option('--unused', is_flag=True, help='Show only unused routes')
+@click.option('--where', help='Find routes by controller name')
+def laravel_routes(unused, where):
+    """
+    Analyze Laravel routes and find unused ones.
+    
+    Examples:
+        2do laravel-routes
+        2do laravel-routes --unused
+        2do laravel-routes --where UserController
+    """
+    console.print("🛣️ [bold blue]Laravel Routes Analysis[/bold blue]")
+    
+    devtoolbox = LaravelDevToolboxIntegration()
+    
+    if not devtoolbox.is_laravel_project():
+        console.print("❌ This doesn't appear to be a Laravel project.")
+        return
+    
+    if not devtoolbox.is_devtoolbox_installed():
+        if devtoolbox.prompt_for_installation():
+            if not devtoolbox.install_devtoolbox():
+                return
+        else:
+            return
+    
+    if unused:
+        console.print("\n🔍 [bold]Finding Unused Routes[/bold]")
+        unused_routes = devtoolbox.find_unused_routes()
+        if unused_routes:
+            for route in unused_routes:
+                console.print(f"  ⚠️ {route}")
+        else:
+            console.print("✅ No unused routes found!")
+    
+    elif where:
+        console.print(f"\n🔍 [bold]Finding Routes for Controller: {where}[/bold]")
+        result = devtoolbox.run_devtoolbox_command('dev:routes:where', [where])
+        if result:
+            console.print(result.get('raw_output', 'No routes found'))
+    
+    else:
+        console.print("\n📋 [bold]All Routes[/bold]")
+        result = devtoolbox.run_devtoolbox_command('dev:routes')
+        if result:
+            console.print(result.get('raw_output', 'No routes found'))
+
+
+@cli.command("laravel-install-devtoolbox")
+def laravel_install_devtoolbox():
+    """
+    Install Laravel DevToolbox for enhanced Laravel analysis.
+    """
+    console.print("📦 [bold blue]Installing Laravel DevToolbox[/bold blue]")
+    
+    devtoolbox = LaravelDevToolboxIntegration()
+    
+    if not devtoolbox.is_laravel_project():
+        console.print("❌ This doesn't appear to be a Laravel project.")
+        console.print("   Laravel DevToolbox can only be installed in Laravel projects.")
+        return
+    
+    if devtoolbox.is_devtoolbox_installed():
+        console.print("✅ Laravel DevToolbox is already installed!")
+        
+        # Show available commands
+        commands = devtoolbox.get_available_commands()
+        if commands:
+            console.print("\n📋 [bold]Available DevToolbox Commands:[/bold]")
+            for cmd in commands:
+                console.print(f"  • php artisan {cmd}")
+        return
+    
+    if devtoolbox.install_devtoolbox():
+        console.print("\n🎉 [bold green]Installation Complete![/bold green]")
+        console.print("\n💡 [bold yellow]You can now use:[/bold yellow]")
+        console.print("   • 2do laravel-analyze - Comprehensive Laravel analysis")
+        console.print("   • 2do laravel-models --graph - Generate model relationship diagrams")
+        console.print("   • 2do laravel-routes --unused - Find unused routes")
 
 
 def main():
